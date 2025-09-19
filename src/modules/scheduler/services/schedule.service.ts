@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { ScheduleJobDto } from '../dto/schedule-job.dto';
-import { Schedule, ScheduleType, Prisma } from '@prisma/client';
+import { Schedule, Prisma } from '@prisma/client';
+import { ScheduleType } from '../../../common/enums';
 import * as moment from 'moment-timezone';
 import * as cron from 'node-cron';
 
@@ -118,7 +119,7 @@ export class ScheduleService {
       // Valider les nouvelles données si des champs critiques sont modifiés
       if (scheduleDto.scheduleType || scheduleDto.cronExpression || scheduleDto.intervalSeconds || scheduleDto.scheduledAt) {
         const fullScheduleDto: ScheduleJobDto = {
-          scheduleType: scheduleDto.scheduleType ?? existingSchedule.scheduleType,
+          scheduleType: scheduleDto.scheduleType ?? (existingSchedule.scheduleType as ScheduleType),
           cronExpression: scheduleDto.cronExpression ?? existingSchedule.cronExpression,
           intervalSeconds: scheduleDto.intervalSeconds ?? existingSchedule.intervalSeconds,
           scheduledAt: scheduleDto.scheduledAt ?? existingSchedule.scheduledAt?.toISOString(),

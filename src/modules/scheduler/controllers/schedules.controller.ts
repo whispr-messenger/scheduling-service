@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -18,15 +19,20 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ScheduleService } from '../services/schedule.service';
 import { ScheduleJobDto } from '../dto/schedule-job.dto';
-import { ScheduleResponseDto } from '../dto/job-response.dto';
+import { UpdateScheduleDto } from '../dto/update-schedule.dto';
+import { ScheduleResponseDto } from '../dto/schedule-response.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard, Roles, Permissions, Role, Permission } from '../../../common/guards/roles.guard';
 
 @ApiTags('schedules')
 @Controller('schedules')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SchedulesController {
   constructor(private readonly scheduleService: ScheduleService) {}
 

@@ -49,10 +49,12 @@ export class JobService {
         },
         targetService: createJobDto.targetService,
         targetMethod: createJobDto.targetMethod,
-        payload: createJobDto.payload,
-        priority: createJobDto.priority ?? category.defaultPriority,
-        maxRetries: createJobDto.maxRetries ?? category.defaultMaxRetries,
-        timeoutSeconds: createJobDto.timeoutSeconds ?? category.defaultTimeout,
+        payload: typeof createJobDto.payload === 'string' 
+          ? createJobDto.payload 
+          : JSON.stringify(createJobDto.payload),
+        priority: createJobDto.priority ?? 'MEDIUM',
+        maxRetries: createJobDto.maxRetries ?? 3,
+        timeoutSeconds: createJobDto.timeoutSeconds ?? 300,
         isActive: createJobDto.isActive ?? true,
         createdBy: createJobDto.createdBy,
       };
@@ -95,8 +97,8 @@ export class JobService {
       ...(filters.createdBy && { createdBy: filters.createdBy }),
       ...(filters.search && {
         OR: [
-          { name: { contains: filters.search, mode: 'insensitive' } },
-          { description: { contains: filters.search, mode: 'insensitive' } },
+          { name: { contains: filters.search } },
+          { description: { contains: filters.search } },
         ],
       }),
       ...(filters.includeDeleted ? {} : { deletedAt: null }),
@@ -191,13 +193,14 @@ export class JobService {
         );
       }
 
+      const { categoryId, ...updateData } = updateJobDto;
       const updatedJob = await this.prisma.job.update({
         where: { id },
         data: {
-          ...updateJobDto,
-          ...(updateJobDto.categoryId && {
+          ...updateData,
+          ...(categoryId && {
             category: {
-              connect: { id: updateJobDto.categoryId },
+              connect: { id: categoryId },
             },
           }),
           ...(updateJobDto.deletedAt && {

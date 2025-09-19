@@ -4,7 +4,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue, Job } from 'bull';
 import { JobData, QueuePriority, JobResult } from '../interfaces/job.interface';
 import { PrismaService } from '../../../common/prisma.service';
-import { ExecutionStatus } from '@prisma/client';
+import { ExecutionStatus } from '../../../common/enums';
 import { IQueueManager } from '../../scheduler/interfaces/queue-manager.interface';
 
 @Injectable()
@@ -108,7 +108,7 @@ export class QueueManagerService implements OnModuleInit, OnModuleDestroy, IQueu
         data: {
           status: ExecutionStatus.FAILED,
           failedAt: new Date(),
-          errorData: { error: error.message },
+          errorData: JSON.stringify({ error: error.message }),
         },
       });
 
@@ -350,10 +350,10 @@ export class QueueManagerService implements OnModuleInit, OnModuleDestroy, IQueu
         data: {
           status: ExecutionStatus.FAILED,
           failedAt: new Date(),
-          errorData: {
+          errorData: JSON.stringify({
             error: 'Service restart',
             reason: 'Job was running when service restarted',
-          },
+          }),
         },
       });
 

@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Priority, ScheduleType, ExecutionStatus } from '@prisma/client';
 
 export class JobCategoryResponseDto {
   @ApiProperty()
@@ -11,8 +10,8 @@ export class JobCategoryResponseDto {
   @ApiPropertyOptional()
   description?: string;
 
-  @ApiProperty({ enum: Priority })
-  defaultPriority: Priority;
+  @ApiProperty({ enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] })
+  defaultPriority: string;
 
   @ApiProperty()
   defaultTimeout: number;
@@ -21,7 +20,7 @@ export class JobCategoryResponseDto {
   defaultMaxRetries: number;
 
   @ApiProperty()
-  configuration: Record<string, any>;
+  configuration: string;
 
   @ApiProperty()
   isActive: boolean;
@@ -40,8 +39,8 @@ export class ScheduleResponseDto {
   @ApiProperty()
   jobId: string;
 
-  @ApiProperty({ enum: ScheduleType })
-  scheduleType: ScheduleType;
+  @ApiProperty({ enum: ['CRON', 'INTERVAL', 'ONCE', 'IMMEDIATE'] })
+  scheduleType: string;
 
   @ApiPropertyOptional()
   cronExpression?: string;
@@ -81,8 +80,8 @@ export class ExecutionResponseDto {
   @ApiPropertyOptional()
   scheduleId?: string;
 
-  @ApiProperty({ enum: ExecutionStatus })
-  status: ExecutionStatus;
+  @ApiProperty({ enum: ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT'] })
+  status: string;
 
   @ApiProperty()
   startedAt: Date;
@@ -97,10 +96,10 @@ export class ExecutionResponseDto {
   attemptNumber: number;
 
   @ApiPropertyOptional()
-  resultData?: Record<string, any>;
+  resultData?: string;
 
   @ApiPropertyOptional()
-  errorData?: Record<string, any>;
+  errorData?: string;
 
   @ApiPropertyOptional()
   durationMs?: number;
@@ -135,10 +134,10 @@ export class JobResponseDto {
   targetMethod: string;
 
   @ApiProperty()
-  payload: Record<string, any>;
+  payload: string;
 
-  @ApiProperty({ enum: Priority })
-  priority: Priority;
+  @ApiProperty({ enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] })
+  priority: string;
 
   @ApiProperty()
   maxRetries: number;

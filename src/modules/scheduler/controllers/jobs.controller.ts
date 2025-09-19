@@ -27,16 +27,20 @@ import { CreateJobDto } from '../dto/create-job.dto';
 import { UpdateJobDto } from '../dto/update-job.dto';
 import { QueryJobsDto } from '../dto/query-jobs.dto';
 import { JobResponseDto } from '../dto/job-response.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard, Roles, Permissions, Role, Permission } from '../../../common/guards/roles.guard';
 
 @ApiTags('jobs')
 @Controller('jobs')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class JobsController {
   constructor(private readonly jobService: JobService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ short: { limit: 5, ttl: 1000 } })
+  @Permissions(Permission.CREATE_JOB)
   @ApiOperation({
     summary: 'Créer une nouvelle tâche',
     description: 'Crée une nouvelle tâche programmable dans le système de scheduling',
@@ -132,6 +136,7 @@ export class JobsController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.UPDATE_JOB)
   @ApiOperation({
     summary: 'Mettre à jour une tâche',
     description: 'Met à jour les propriétés d\'une tâche existante',
@@ -164,6 +169,7 @@ export class JobsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.DELETE_JOB)
   @ApiOperation({
     summary: 'Supprimer une tâche (suppression logique)',
     description: 'Effectue une suppression logique de la tâche et désactive ses planifications',
@@ -219,6 +225,8 @@ export class JobsController {
   @Delete(':id/permanent')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ short: { limit: 2, ttl: 10000 } })
+  @Roles(Role.ADMIN)
+  @Permissions(Permission.ADMIN_OPERATIONS)
   @ApiOperation({
     summary: 'Supprimer définitivement une tâche',
     description: 'Supprime définitivement une tâche et toutes ses données associées (ATTENTION: irréversible)',

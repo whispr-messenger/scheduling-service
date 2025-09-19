@@ -9,17 +9,17 @@ import { QueuesModule } from '../queues/queues.module';
 import { QueueManagerService } from '../queues/services/queue-manager.service';
 
 @Module({
-  imports: [QueuesModule],
+  imports: [/* QueuesModule */], // Désactivé temporairement
   controllers: [JobsController, SchedulesController],
   providers: [
     JobService,
     ScheduleService,
     SchedulerService,
-    RedisService,
-    {
-      provide: 'QUEUE_MANAGER',
-      useClass: QueueManagerService,
-    },
+    // RedisService, // Désactivé temporairement
+    // {
+    //   provide: 'QUEUE_MANAGER',
+    //   useClass: QueueManagerService,
+    // },
   ],
   exports: [JobService, ScheduleService, SchedulerService],
 })

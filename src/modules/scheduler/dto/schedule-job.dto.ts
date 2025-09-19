@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsDateString, IsBoolean, ValidateIf, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ScheduleType } from '@prisma/client';
+import { ScheduleType } from '../../../common/enums';
 import { Transform } from 'class-transformer';
 
 export class ScheduleJobDto {
