@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsInt, IsObject, Min, Max, IsUUID, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Priority } from '@prisma/client';
+import { Priority } from '../../../common/enums';
 import { Transform } from 'class-transformer';
 
 export class CreateJobDto {

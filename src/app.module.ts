@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -32,34 +32,32 @@ import { CommonModule } from './modules/common/common.module';
     // Planification NestJS
     ScheduleModule.forRoot(),
 
-    // Bull Queue avec Redis
-    BullModule.forRootAsync({
-      useFactory: async (configService: ConfigService) => {
-        const redisConfig = configService.get('redis');
-        return {
-          redis: {
-            host: redisConfig.host,
-            port: redisConfig.port,
-            password: redisConfig.password,
-            db: redisConfig.db,
-            maxRetriesPerRequest: 3,
-            retryDelayOnFailover: 100,
-            enableReadyCheck: true,
-            lazyConnect: true,
-          },
-          defaultJobOptions: {
-            removeOnComplete: 100,
-            removeOnFail: 50,
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 2000,
-            },
-          },
-        };
-      },
-      inject: [ConfigService],
-    }),
+    // Bull Queue avec Redis (désactivé temporairement pour développement)
+    // BullModule.forRootAsync({
+    //   useFactory: async (configService: ConfigService) => {
+    //     const redisConfig = configService.get('redis');
+    //     return {
+    //       redis: {
+    //         host: redisConfig.host,
+    //         port: redisConfig.port,
+    //         password: redisConfig.password,
+    //         db: redisConfig.db,
+    //         retryDelayOnFailover: 100,
+    //         lazyConnect: true,
+    //       },
+    //       defaultJobOptions: {
+    //         removeOnComplete: 100,
+    //         removeOnFail: 50,
+    //         attempts: 3,
+    //         backoff: {
+    //           type: 'exponential',
+    //           delay: 2000,
+    //         },
+    //       },
+    //     };
+    //   },
+    //   inject: [ConfigService],
+    // }),
 
     // Rate limiting
     ThrottlerModule.forRoot([
@@ -87,8 +85,8 @@ import { CommonModule } from './modules/common/common.module';
     CommonModule,
     SchedulerModule,
     TasksModule,
-    QueuesModule,
-    MonitoringModule,
+    // QueuesModule, // Désactivé temporairement (nécessite Redis)
+    // MonitoringModule, // Désactivé temporairement (nécessite Redis)
     GrpcModule,
   ],
 })

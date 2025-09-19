@@ -1,0 +1,107 @@
+// Schéma Prisma simplifié pour développement avec SQLite
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Tables principales simplifiées pour développement
+
+model JobCategory {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  description       String?
+  defaultPriority   String   @default("MEDIUM") @map("default_priority") // Enum as string
+  defaultTimeout    Int      @default(300) @map("default_timeout")
+  defaultMaxRetries Int      @default(3) @map("default_max_retries")
+  configuration     String   @default("{}") // JSON as string
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  jobs Job[]
+
+  @@map("job_categories")
+}
+
+model Job {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  categoryId     String   @map("category_id")
+  targetService  String   @map("target_service")
+  targetMethod   String   @map("target_method")
+  payload        String   @default("{}") // JSON as string
+  priority       String   @default("MEDIUM") // Enum as string
+  maxRetries     Int      @default(3) @map("max_retries")
+  timeoutSeconds Int      @default(30) @map("timeout_seconds")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  category   JobCategory @relation(fields: [categoryId], references: [id])
+  schedules  Schedule[]
+  executions Execution[]
+
+  @@map("jobs")
+}
+
+model Schedule {
+  id              String    @id @default(cuid())
+  jobId           String    @map("job_id")
+  scheduleType    String    @map("schedule_type") // Enum as string
+  cronExpression  String?   @map("cron_expression")
+  intervalSeconds Int?      @map("interval_seconds")
+  scheduledAt     DateTime? @map("scheduled_at")
+  timezone        String?   @default("UTC")
+  startsAt        DateTime? @map("starts_at")
+  endsAt          DateTime? @map("ends_at")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  executions Execution[]
+
+  @@map("schedules")
+}
+
+model Execution {
+  id            String    @id @default(cuid())
+  jobId         String    @map("job_id")
+  scheduleId    String?   @map("schedule_id")
+  status        String    @default("PENDING") // Enum as string
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  failedAt      DateTime? @map("failed_at")
+  attemptNumber Int       @default(1) @map("attempt_number")
+  resultData    String?   @map("result_data") // JSON as string
+  errorData     String?   @map("error_data") // JSON as string
+  durationMs    Int?      @map("duration_ms")
+  correlationId String?   @map("correlation_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  schedule Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  logs     ExecutionLog[]
+
+  @@map("executions")
+}
+
+model ExecutionLog {
+  id          String   @id @default(cuid())
+  executionId String   @map("execution_id")
+  level       String   // Enum as string
+  message     String
+  context     String   @default("{}") // JSON as string
+  loggedAt    DateTime @default(now()) @map("logged_at")
+
+  execution Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@map("execution_logs")
+}

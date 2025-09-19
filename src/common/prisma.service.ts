@@ -40,22 +40,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       await this.$connect();
       this.logger.log('Successfully connected to PostgreSQL database');
 
-      // Écoute des événements de log Prisma
-      this.$on('query', (e) => {
-        this.logger.debug(`Query: ${e.query} - Params: ${e.params} - Duration: ${e.duration}ms`);
-      });
-
-      this.$on('info', (e) => {
-        this.logger.log(`Info: ${e.message}`);
-      });
-
-      this.$on('warn', (e) => {
-        this.logger.warn(`Warning: ${e.message}`);
-      });
-
-      this.$on('error', (e) => {
-        this.logger.error(`Error: ${e.message}`, e.target);
-      });
+      // Configuration des logs Prisma via les options du client
+      // Les événements de log sont maintenant configurés via les options du constructeur
 
     } catch (error) {
       this.logger.error('Failed to connect to database', error);

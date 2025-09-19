@@ -1,4 +1,4 @@
-import { Priority } from '@prisma/client';
+import { Priority } from '../../../common/enums';
 
 export interface JobData {
   id: string;

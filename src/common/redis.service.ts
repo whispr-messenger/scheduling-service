@@ -16,10 +16,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       password: redisConfig.password,
       db: redisConfig.db,
       maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
-      retryDelayOnFailover: redisConfig.retryDelayOnFailover,
       enableReadyCheck: redisConfig.enableReadyCheck,
       lazyConnect: redisConfig.lazyConnect,
-      maxmemoryPolicy: redisConfig.maxmemoryPolicy,
     });
 
     // Événements de connexion
