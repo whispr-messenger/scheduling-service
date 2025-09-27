@@ -1,0 +1,178 @@
+// Prisma schema for Whispr Scheduling Service
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ScheduleType {
+  CRON
+  INTERVAL
+  ONCE
+  IMMEDIATE
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  FATAL
+}
+
+enum DependencyType {
+  SUCCESS
+  COMPLETION
+  FAILURE
+}
+
+model JobCategory {
+  id                   String   @id @default(uuid()) @db.Uuid
+  name                 String   @unique @db.VarChar(100)
+  description          String?  @db.Text
+  defaultPriority      Priority @default(MEDIUM) @map("default_priority")
+  defaultTimeout       Int      @default(300) @map("default_timeout")
+  defaultMaxRetries    Int      @default(3) @map("default_max_retries")
+  configuration        Json     @default("{}") @db.JsonB
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  jobs Job[]
+
+  @@map("job_categories")
+}
+
+model Job {
+  id             String      @id @default(uuid()) @db.Uuid
+  name           String      @db.VarChar(200)
+  description    String?     @db.Text
+  categoryId     String      @map("category_id") @db.Uuid
+  targetService  String      @map("target_service") @db.VarChar(100)
+  targetMethod   String      @map("target_method") @db.VarChar(100)
+  payload        Json        @default("{}") @db.JsonB
+  priority       Priority    @default(MEDIUM)
+  maxRetries     Int         @default(3) @map("max_retries")
+  timeoutSeconds Int         @default(300) @map("timeout_seconds")
+  isActive       Boolean     @default(true) @map("is_active")
+  createdBy      String?     @map("created_by") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamp(6)
+
+  category          JobCategory       @relation(fields: [categoryId], references: [id])
+  schedules         Schedule[]
+  executions        Execution[]
+  dependencies      JobDependency[]   @relation("DependentJob")
+  dependedOnBy      JobDependency[]   @relation("DependedOnJob")
+  recurringPatterns RecurringJob[]
+
+  @@map("jobs")
+}
+
+model Schedule {
+  id             String       @id @default(uuid()) @db.Uuid
+  jobId          String       @map("job_id") @db.Uuid
+  scheduleType   ScheduleType @map("schedule_type")
+  cronExpression String?      @map("cron_expression") @db.VarChar(100)
+  intervalSeconds Int?        @map("interval_seconds")
+  scheduledAt    DateTime?    @map("scheduled_at") @db.Timestamp(6)
+  timezone       String       @default("UTC") @db.VarChar(50)
+  startsAt       DateTime?    @map("starts_at") @db.Timestamp(6)
+  endsAt         DateTime?    @map("ends_at") @db.Timestamp(6)
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  executions Execution[]
+
+  @@map("schedules")
+}
+
+model Execution {
+  id           String          @id @default(uuid()) @db.Uuid
+  jobId        String          @map("job_id") @db.Uuid
+  scheduleId   String?         @map("schedule_id") @db.Uuid
+  status       ExecutionStatus
+  startedAt    DateTime        @default(now()) @map("started_at") @db.Timestamp(6)
+  completedAt  DateTime?       @map("completed_at") @db.Timestamp(6)
+  failedAt     DateTime?       @map("failed_at") @db.Timestamp(6)
+  attemptNumber Int            @default(1) @map("attempt_number")
+  resultData   Json?           @map("result_data") @db.JsonB
+  errorData    Json?           @map("error_data") @db.JsonB
+  durationMs   Int?            @map("duration_ms")
+  workerId     String?         @map("worker_id") @db.VarChar(100)
+  correlationId String?        @map("correlation_id") @db.VarChar(100)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+
+  job      Job       @relation(fields: [jobId], references: [id])
+  schedule Schedule? @relation(fields: [scheduleId], references: [id])
+  logs     ExecutionLog[]
+
+  @@map("executions")
+}
+
+model ExecutionLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  executionId String   @map("execution_id") @db.Uuid
+  logLevel    LogLevel @map("log_level")
+  message     String   @db.Text
+  context     Json     @default("{}") @db.JsonB
+  loggedAt    DateTime @default(now()) @map("logged_at") @db.Timestamp(6)
+
+  execution Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@map("execution_logs")
+}
+
+model RecurringJob {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String    @db.VarChar(200)
+  patternType     String    @map("pattern_type") @db.VarChar(50)
+  patternConfig   Json      @map("pattern_config") @db.JsonB
+  templateJobId   String    @map("template_job_id") @db.Uuid
+  lastGenerated   DateTime? @map("last_generated") @db.Timestamp(6)
+  nextGeneration  DateTime? @map("next_generation") @db.Timestamp(6)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  templateJob Job @relation(fields: [templateJobId], references: [id])
+
+  @@map("recurring_jobs")
+}
+
+model JobDependency {
+  id                String         @id @default(uuid()) @db.Uuid
+  jobId             String         @map("job_id") @db.Uuid
+  dependsOnJobId    String         @map("depends_on_job_id") @db.Uuid
+  dependencyType    DependencyType @map("dependency_type")
+  dependencyConfig  Json           @default("{}") @map("dependency_config") @db.JsonB
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamp(6)
+
+  job          Job @relation("DependentJob", fields: [jobId], references: [id], onDelete: Cascade)
+  dependsOnJob Job @relation("DependedOnJob", fields: [dependsOnJobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, dependsOnJobId, dependencyType])
+  @@map("job_dependencies")
+}
