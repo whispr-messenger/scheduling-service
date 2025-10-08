@@ -39,8 +39,12 @@ import { AppService } from './app.service';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: () => ({
-        ttl: 60, // 1 minute
-        limit: 100, // 100 requests per minute per IP
+        throttlers: [
+          {
+            ttl: 60000, // 1 minute in milliseconds
+            limit: 100, // 100 requests per minute per IP
+          },
+        ],
       }),
     }),
 
@@ -59,9 +63,9 @@ import { AppService } from './app.service';
       useFactory: () => ({
         redis: {
           host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+          port: parseInt(process.env.REDIS_PORT || '6379', 10),
           password: process.env.REDIS_PASSWORD,
-          db: parseInt(process.env.REDIS_DB, 10) || 0,
+          db: parseInt(process.env.REDIS_DB || '0', 10),
         },
       }),
     }),

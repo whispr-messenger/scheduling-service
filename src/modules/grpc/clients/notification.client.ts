@@ -2,13 +2,13 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientGrpc, Client, Transport } from '@nestjs/microservices';
 import { join } from 'path';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 
 // Notification service interface
 export interface NotificationServiceClient {
-  sendDelayedNotification(data: SendDelayedNotificationRequest): Promise<NotificationResponse>;
-  cleanupNotificationHistory(data: CleanupRequest): Promise<CleanupResponse>;
-  healthCheck(): Promise<HealthResponse>;
+  sendDelayedNotification(data: SendDelayedNotificationRequest): Observable<NotificationResponse>;
+  cleanupNotificationHistory(data: CleanupRequest): Observable<CleanupResponse>;
+  healthCheck(): Observable<HealthResponse>;
 }
 
 export interface SendDelayedNotificationRequest {

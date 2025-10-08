@@ -64,7 +64,7 @@ export class MetricsService {
         this.getJobMetrics(),
         this.getExecutionMetrics(),
         this.getQueueMetrics(),
-        this.getSystemMetrics(),
+        Promise.resolve(this.collectSystemMetrics()),
       ]);
 
       const metrics: SystemMetrics = {
@@ -202,7 +202,7 @@ export class MetricsService {
     };
   }
 
-  private getSystemMetrics() {
+  private collectSystemMetrics() {
     const memUsage = process.memoryUsage();
     const uptime = Date.now() - this.startTime;
 

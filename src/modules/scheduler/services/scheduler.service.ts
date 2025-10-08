@@ -157,7 +157,7 @@ export class SchedulerService {
       }
 
       // Execute job with timeout
-      const result = await this.executeWithTimeout(job, execution.timeoutSeconds * 1000);
+      const result = await this.executeWithTimeout(job, job.timeoutSeconds * 1000);
 
       // Update execution with success
       const duration = Date.now() - startTime;
@@ -283,24 +283,28 @@ export class SchedulerService {
         break;
 
       case ScheduleType.CRON:
-        await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-          jobId: job.id,
-          scheduleId: schedule.id,
-        }, {
-          cron: schedule.cronExpression!,
-          tz: schedule.timezone,
-          jobId: schedule.id,
-        });
+        if (schedule.cronExpression) {
+          await this.queueService.addRepeatableJob(queueName, 'execute-job', {
+            jobId: job.id,
+            scheduleId: schedule.id,
+          }, {
+            cron: schedule.cronExpression,
+            tz: schedule.timezone,
+            jobId: schedule.id,
+          } as any);
+        }
         break;
 
       case ScheduleType.INTERVAL:
-        await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-          jobId: job.id,
-          scheduleId: schedule.id,
-        }, {
-          every: schedule.intervalSeconds! * 1000,
-          jobId: schedule.id,
-        });
+        if (schedule.intervalSeconds) {
+          await this.queueService.addRepeatableJob(queueName, 'execute-job', {
+            jobId: job.id,
+            scheduleId: schedule.id,
+          }, {
+            every: schedule.intervalSeconds * 1000,
+            jobId: schedule.id,
+          } as any);
+        }
         break;
     }
   }
@@ -344,7 +348,7 @@ export class SchedulerService {
     return {
       id: job.id,
       name: job.name,
-      description: job.description,
+      description: job.description ?? undefined,
       categoryId: job.categoryId,
       targetService: job.targetService,
       targetMethod: job.targetMethod,
@@ -353,10 +357,10 @@ export class SchedulerService {
       maxRetries: job.maxRetries,
       timeoutSeconds: job.timeoutSeconds,
       isActive: job.isActive,
-      createdBy: job.createdBy,
+      createdBy: job.createdBy ?? undefined,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
-      deletedAt: job.deletedAt,
+      deletedAt: job.deletedAt ?? undefined,
     };
   }
 
@@ -365,12 +369,12 @@ export class SchedulerService {
       id: schedule.id,
       jobId: schedule.jobId,
       scheduleType: schedule.scheduleType,
-      cronExpression: schedule.cronExpression,
-      intervalSeconds: schedule.intervalSeconds,
-      scheduledAt: schedule.scheduledAt,
+      cronExpression: schedule.cronExpression ?? undefined,
+      intervalSeconds: schedule.intervalSeconds ?? undefined,
+      scheduledAt: schedule.scheduledAt ?? undefined,
       timezone: schedule.timezone,
-      startsAt: schedule.startsAt,
-      endsAt: schedule.endsAt,
+      startsAt: schedule.startsAt ?? undefined,
+      endsAt: schedule.endsAt ?? undefined,
       isActive: schedule.isActive,
       createdAt: schedule.createdAt,
       updatedAt: schedule.updatedAt,
@@ -381,17 +385,17 @@ export class SchedulerService {
     return {
       id: execution.id,
       jobId: execution.jobId,
-      scheduleId: execution.scheduleId,
+      scheduleId: execution.scheduleId ?? undefined,
       status: execution.status,
       startedAt: execution.startedAt,
-      completedAt: execution.completedAt,
-      failedAt: execution.failedAt,
+      completedAt: execution.completedAt ?? undefined,
+      failedAt: execution.failedAt ?? undefined,
       attemptNumber: execution.attemptNumber,
-      resultData: execution.resultData as Record<string, any>,
-      errorData: execution.errorData as Record<string, any>,
-      durationMs: execution.durationMs,
-      workerId: execution.workerId,
-      correlationId: execution.correlationId,
+      resultData: execution.resultData as Record<string, any> | undefined,
+      errorData: execution.errorData as Record<string, any> | undefined,
+      durationMs: execution.durationMs ?? undefined,
+      workerId: execution.workerId ?? undefined,
+      correlationId: execution.correlationId ?? undefined,
       createdAt: execution.createdAt,
     };
   }
