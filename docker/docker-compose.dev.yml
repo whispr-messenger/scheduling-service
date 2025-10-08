@@ -14,9 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scheduling_service -d whispr_scheduling"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,9 +42,8 @@ services:
   # Scheduling Service
   scheduling-service:
     build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+      context: ..
+      dockerfile: ./docker/Dockerfile.dev
     container_name: whispr-scheduling-service
     environment:
       NODE_ENV: development
@@ -71,7 +69,10 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./logs:/app/logs
+      # Mount repository root into container so source files are available for development
+      - ..:/app
+      # Keep node_modules inside the container to avoid host/permission issues
+      - /app/node_modules
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/monitoring/health"]
       interval: 30s
