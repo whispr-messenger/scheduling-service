@@ -30,7 +30,7 @@ export class RetryUtil {
     options: RetryOptions,
     context?: string,
   ): Promise<T> {
-    let lastError: Error | undefined;
+    let lastError: Error = new Error('Retry failed with no error captured');
 
     for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
       try {
@@ -67,7 +67,7 @@ export class RetryUtil {
       }
     }
 
-    throw lastError || new Error('Retry failed with no error captured');
+    throw lastError;
   }
 
   private static isRetryableError(error: Error, retryableErrors: string[]): boolean {
