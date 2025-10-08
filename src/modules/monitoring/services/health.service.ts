@@ -49,9 +49,13 @@ export class CustomHealthService extends HealthIndicator {
       const isHealthy = await this.prisma.healthCheck();
       const connectionInfo = await this.prisma.getConnectionInfo();
 
+      const info = Array.isArray(connectionInfo) && connectionInfo.length > 0
+        ? connectionInfo[0] as Record<string, any>
+        : {};
+
       return this.getStatus('database', isHealthy, {
         message: isHealthy ? 'Database connection is healthy' : 'Database connection failed',
-        ...(Array.isArray(connectionInfo) && connectionInfo.length > 0 ? connectionInfo[0] : {}),
+        ...info,
       });
     } catch (error) {
       this.logger.error('Database health check failed', error);
@@ -89,7 +93,7 @@ export class CustomHealthService extends HealthIndicator {
     try {
       const queueStats = await this.queueService.getAllQueueStats();
       const totalJobs = queueStats.reduce((sum, queue) => {
-        return sum + Object.values(queue.counts).reduce((a: number, b) => a + (b as number), 0);
+        return sum + Object.values(queue.counts).reduce((a, b) => (a as number) + (b as number), 0);
       }, 0);
 
       const failedJobs = queueStats.reduce((sum, queue) => sum + queue.counts.failed, 0);
