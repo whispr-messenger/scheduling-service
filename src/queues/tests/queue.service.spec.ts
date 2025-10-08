@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { QueueService } from '../queue.service';
 import { JobPriority } from '../enums';
@@ -257,9 +258,7 @@ describe('QueueService', () => {
     });
 
     it('should get active jobs with pagination', async () => {
-      const mockJobs = [
-        { id: '3', data: { type: JobType.CLEANUP } },
-      ];
+      const mockJobs = [{ id: '3', data: { type: JobType.CLEANUP } }];
 
       service.getJobsByState.mockResolvedValue(mockJobs);
 

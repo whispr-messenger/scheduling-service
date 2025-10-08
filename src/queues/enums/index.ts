@@ -22,10 +22,10 @@ export enum QueueName {
  * Queue processing strategies
  */
 export enum ProcessingStrategy {
-  FIFO = 'fifo',          // First In, First Out
-  LIFO = 'lifo',          // Last In, First Out
-  PRIORITY = 'priority',   // Priority-based processing
-  DELAYED = 'delayed',     // Time-based delayed processing
+  FIFO = 'fifo', // First In, First Out
+  LIFO = 'lifo', // Last In, First Out
+  PRIORITY = 'priority', // Priority-based processing
+  DELAYED = 'delayed', // Time-based delayed processing
 }
 
 /**

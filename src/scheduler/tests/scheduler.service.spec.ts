@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { SchedulerService } from '../scheduler.service';
 import { CreateJobDto } from '../dto/create-job.dto';

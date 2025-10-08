@@ -77,9 +77,7 @@ export class MessagingGrpcClient implements OnModuleInit {
     });
 
     try {
-      const response = await firstValueFrom(
-        this.messagingService.sendScheduledMessage(request)
-      );
+      const response = await firstValueFrom(this.messagingService.sendScheduledMessage(request));
 
       this.logger.log('Scheduled message sent successfully', {
         messageId: response.messageId,
@@ -103,9 +101,7 @@ export class MessagingGrpcClient implements OnModuleInit {
     });
 
     try {
-      const response = await firstValueFrom(
-        this.messagingService.cleanupExpiredMessages(request)
-      );
+      const response = await firstValueFrom(this.messagingService.cleanupExpiredMessages(request));
 
       this.logger.log('Message cleanup completed', {
         deletedCount: response.deletedCount,
@@ -122,9 +118,7 @@ export class MessagingGrpcClient implements OnModuleInit {
 
   async healthCheck(): Promise<HealthResponse> {
     try {
-      const response = await firstValueFrom(
-        this.messagingService.healthCheck()
-      );
+      const response = await firstValueFrom(this.messagingService.healthCheck());
 
       return response;
     } catch (error) {

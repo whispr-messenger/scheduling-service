@@ -111,15 +111,7 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
     SchedulerModule,
     MonitoringModule,
   ],
-  providers: [
-    GrpcSchedulerService,
-    MessagingGrpcClient,
-    NotificationGrpcClient,
-  ],
-  exports: [
-    GrpcSchedulerService,
-    MessagingGrpcClient,
-    NotificationGrpcClient,
-  ],
+  providers: [GrpcSchedulerService, MessagingGrpcClient, NotificationGrpcClient],
+  exports: [GrpcSchedulerService, MessagingGrpcClient, NotificationGrpcClient],
 })
 export class GrpcModule {}

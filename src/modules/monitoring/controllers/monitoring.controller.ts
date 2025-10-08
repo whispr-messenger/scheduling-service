@@ -9,17 +9,8 @@ import {
   UseInterceptors,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiQuery,
-} from '@nestjs/swagger';
-import {
-  HealthCheck,
-  HealthCheckResult,
-} from '@nestjs/terminus';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { CustomHealthService } from '../services/health.service';
 import { MetricsService, SystemMetrics } from '../services/metrics.service';
 import { QueueService } from '@/modules/queues/services/queue.service';

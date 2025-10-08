@@ -179,8 +179,8 @@ export class Schedule {
     const now = new Date();
     return Boolean(
       this.status === ScheduleStatus.EXPIRED ||
-      (this.endAt && now > this.endAt) ||
-      (this.maxExecutions && this.executionCount >= this.maxExecutions)
+        (this.endAt && now > this.endAt) ||
+        (this.maxExecutions && this.executionCount >= this.maxExecutions),
     );
   }
 

@@ -96,7 +96,11 @@ async function bootstrap() {
   logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
   if (configService.get('app.swagger.enabled')) {
-    logger.log(`📚 API Documentation available at http://localhost:${port}${configService.get('app.swagger.path')}`);
+    logger.log(
+      `📚 API Documentation available at http://localhost:${port}${configService.get(
+        'app.swagger.path',
+      )}`,
+    );
   }
 
   // Graceful shutdown
