@@ -32,7 +32,6 @@ export class JobExecution {
   status: ExecutionStatus;
 
   @Column({ type: 'timestamp', name: 'started_at' })
-  @Index()
   startedAt: Date;
 
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
