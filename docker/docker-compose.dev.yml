@@ -2,20 +2,20 @@ version: '3.8'
 
 services:
   # PostgreSQL Database
-  postgres:
+  postgres-dev:
     image: postgres:15-alpine
     container_name: whispr-scheduling-db
     environment:
-      POSTGRES_DB: whispr_scheduling
-      POSTGRES_USER: scheduling_service
-      POSTGRES_PASSWORD: development_password
+      POSTGRES_DB: whispr_media_dev
+      POSTGRES_USER: whisper_user
+      POSTGRES_PASSWORD: whisper_password
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scheduling_service -d whispr_scheduling"]
+      test: ["CMD-SHELL", "pg_isready -U whisper_user -d whispr_media_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,16 +24,16 @@ services:
       - whispr-network
 
   # Redis for Bull Queue
-  redis:
+  redis-dev:
     image: redis:7-alpine
     container_name: whispr-scheduling-redis
-    command: redis-server --appendonly yes --requirepass development_password
+    command: redis-server --appendonly yes --requirepass redis_password
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "development_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -70,9 +70,9 @@ services:
       - "3001:3001"
       - "50051:50051"
     depends_on:
-      postgres:
+      postgres-dev:
         condition: service_healthy
-      redis:
+      redis-dev:
         condition: service_healthy
     volumes:
       # Mount repository root into container so source files are available for development
@@ -98,7 +98,7 @@ services:
     ports:
       - "8081:8081"
     depends_on:
-      - redis
+      - redis-dev
     networks:
       - whispr-network
     profiles:
@@ -115,7 +115,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - postgres
+      - postgres-dev
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
