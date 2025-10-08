@@ -59,13 +59,13 @@ export class MetricsService {
         jobMetrics,
         executionMetrics,
         queueMetrics,
-        systemMetrics,
       ] = await Promise.all([
         this.getJobMetrics(),
         this.getExecutionMetrics(),
         this.getQueueMetrics(),
-        Promise.resolve(this.collectSystemMetrics()),
       ]);
+
+      const systemMetrics = this.getSystemRuntimeMetrics();
 
       const metrics: SystemMetrics = {
         timestamp: new Date(),
@@ -202,7 +202,7 @@ export class MetricsService {
     };
   }
 
-  private collectSystemMetrics() {
+  private getSystemRuntimeMetrics() {
     const memUsage = process.memoryUsage();
     const uptime = Date.now() - this.startTime;
 
