@@ -49,9 +49,10 @@ export class CustomHealthService extends HealthIndicator {
       const isHealthy = await this.prisma.healthCheck();
       const connectionInfo = await this.prisma.getConnectionInfo();
 
-      const info = Array.isArray(connectionInfo) && connectionInfo.length > 0
-        ? connectionInfo[0] as Record<string, any>
-        : {};
+      const info =
+        Array.isArray(connectionInfo) && connectionInfo.length > 0
+          ? (connectionInfo[0] as Record<string, any>)
+          : {};
 
       return this.getStatus('database', isHealthy, {
         message: isHealthy ? 'Database connection is healthy' : 'Database connection failed',
@@ -106,7 +107,7 @@ export class CustomHealthService extends HealthIndicator {
         totalJobs,
         failedJobs,
         successRate: `${(healthRatio * 100).toFixed(2)}%`,
-        queues: queueStats.map(q => ({
+        queues: queueStats.map((q) => ({
           name: q.queueName,
           counts: q.counts,
         })),
@@ -149,7 +150,6 @@ export class CustomHealthService extends HealthIndicator {
   async diskHealthIndicator(): Promise<HealthIndicatorResult> {
     try {
       // Basic disk usage check (simplified)
-      const stats = require('fs').statSync('.');
       const isHealthy = true; // Simplified for now
 
       return this.getStatus('disk', isHealthy, {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
   Logger,
@@ -122,7 +123,11 @@ export class SchedulerService {
     }
   }
 
-  async executeJob(jobId: string, scheduleId?: string, correlationId?: string): Promise<ExecutionResponseDto> {
+  async executeJob(
+    jobId: string,
+    scheduleId?: string,
+    correlationId?: string,
+  ): Promise<ExecutionResponseDto> {
     const executionId = uuidv4();
     const startTime = Date.now();
 
@@ -130,7 +135,7 @@ export class SchedulerService {
       executionId,
       jobId,
       scheduleId,
-      correlationId
+      correlationId,
     });
 
     // Create execution record
@@ -174,7 +179,7 @@ export class SchedulerService {
       this.logger.log('Job execution completed successfully', {
         executionId,
         jobId,
-        duration
+        duration,
       });
 
       return this.mapExecutionToResponse(updatedExecution);
@@ -226,7 +231,7 @@ export class SchedulerService {
       skip: offset,
     });
 
-    return executions.map(execution => this.mapExecutionToResponse(execution));
+    return executions.map((execution) => this.mapExecutionToResponse(execution));
   }
 
   async getSchedules(jobId?: string): Promise<ScheduleResponseDto[]> {
@@ -235,7 +240,7 @@ export class SchedulerService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return schedules.map(schedule => this.mapScheduleToResponse(schedule));
+    return schedules.map((schedule) => this.mapScheduleToResponse(schedule));
   }
 
   async cancelSchedule(scheduleId: string): Promise<void> {
@@ -272,38 +277,53 @@ export class SchedulerService {
       case ScheduleType.ONCE:
         if (schedule.scheduledAt) {
           const delay = schedule.scheduledAt.getTime() - Date.now();
-          await this.queueService.addJob(queueName, 'execute-job', {
-            jobId: job.id,
-            scheduleId: schedule.id,
-          }, {
-            delay: Math.max(0, delay),
-            jobId: schedule.id,
-          });
+          await this.queueService.addJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              delay: Math.max(0, delay),
+              jobId: schedule.id,
+            },
+          );
         }
         break;
 
       case ScheduleType.CRON:
         if (schedule.cronExpression) {
-          await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-            jobId: job.id,
-            scheduleId: schedule.id,
-          }, {
-            cron: schedule.cronExpression,
-            tz: schedule.timezone,
-            jobId: schedule.id,
-          } as any);
+          await this.queueService.addRepeatableJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              cron: schedule.cronExpression,
+              tz: schedule.timezone,
+              jobId: schedule.id,
+            } as any,
+          );
         }
         break;
 
       case ScheduleType.INTERVAL:
         if (schedule.intervalSeconds) {
-          await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-            jobId: job.id,
-            scheduleId: schedule.id,
-          }, {
-            every: schedule.intervalSeconds * 1000,
-            jobId: schedule.id,
-          } as any);
+          await this.queueService.addRepeatableJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              every: schedule.intervalSeconds * 1000,
+              jobId: schedule.id,
+            } as any,
+          );
         }
         break;
     }

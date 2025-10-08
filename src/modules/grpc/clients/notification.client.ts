@@ -69,11 +69,14 @@ export class NotificationGrpcClient implements OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
-    this.notificationService = this.client.getService<NotificationServiceClient>('NotificationService');
+    this.notificationService =
+      this.client.getService<NotificationServiceClient>('NotificationService');
     this.logger.log('Notification gRPC client initialized');
   }
 
-  async sendDelayedNotification(request: SendDelayedNotificationRequest): Promise<NotificationResponse> {
+  async sendDelayedNotification(
+    request: SendDelayedNotificationRequest,
+  ): Promise<NotificationResponse> {
     this.logger.log('Sending delayed notification via gRPC', {
       userId: request.userId,
       type: request.type,
@@ -82,7 +85,7 @@ export class NotificationGrpcClient implements OnModuleInit {
 
     try {
       const response = await firstValueFrom(
-        this.notificationService.sendDelayedNotification(request)
+        this.notificationService.sendDelayedNotification(request),
       );
 
       this.logger.log('Delayed notification sent successfully', {
@@ -110,7 +113,7 @@ export class NotificationGrpcClient implements OnModuleInit {
 
     try {
       const response = await firstValueFrom(
-        this.notificationService.cleanupNotificationHistory(request)
+        this.notificationService.cleanupNotificationHistory(request),
       );
 
       this.logger.log('Notification history cleanup completed', {
@@ -128,9 +131,7 @@ export class NotificationGrpcClient implements OnModuleInit {
 
   async healthCheck(): Promise<HealthResponse> {
     try {
-      const response = await firstValueFrom(
-        this.notificationService.healthCheck()
-      );
+      const response = await firstValueFrom(this.notificationService.healthCheck());
 
       return response;
     } catch (error) {

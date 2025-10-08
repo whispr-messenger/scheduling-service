@@ -1,7 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 
 export class CronUtil {
-  private static readonly CRON_REGEX = /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|\*\/([1-9]|1[0-9]|2[0-9]|3[0-1])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/;
+  private static readonly CRON_REGEX =
+    /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|\*\/([1-9]|1[0-9]|2[0-9]|3[0-1])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/;
 
   static validateCronExpression(cronExpression: string): void {
     if (!cronExpression) {
@@ -13,7 +14,7 @@ export class CronUtil {
     }
   }
 
-  static getNextExecutionTime(cronExpression: string, timezone = 'UTC'): Date {
+  static getNextExecutionTime(cronExpression: string): Date {
     this.validateCronExpression(cronExpression);
 
     // Basic implementation - use node-cron or cron-parser in production

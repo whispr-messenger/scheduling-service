@@ -3,7 +3,6 @@ import { HealthIndicatorResult, HealthIndicator } from '@nestjs/terminus';
 
 @Injectable()
 export class MonitoringService extends HealthIndicator {
-
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     // Basic health check - can be extended with actual service checks
     const isHealthy = true; // Add actual health logic here

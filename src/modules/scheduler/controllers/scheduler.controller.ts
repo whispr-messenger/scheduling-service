@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Controller,
   Get,
@@ -90,9 +91,7 @@ export class SchedulerController {
     type: ExecutionResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  async executeJob(
-    @Param('jobId', ParseUUIDPipe) jobId: string,
-  ): Promise<ExecutionResponseDto> {
+  async executeJob(@Param('jobId', ParseUUIDPipe) jobId: string): Promise<ExecutionResponseDto> {
     return this.schedulerService.executeJob(jobId);
   }
 
@@ -105,17 +104,25 @@ export class SchedulerController {
     type: JobResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  async getJob(
-    @Param('jobId', ParseUUIDPipe) jobId: string,
-  ): Promise<JobResponseDto> {
+  async getJob(@Param('jobId', ParseUUIDPipe) jobId: string): Promise<JobResponseDto> {
     return this.schedulerService.getJob(jobId);
   }
 
   @Get(':jobId/executions')
   @ApiOperation({ summary: 'Get job execution history' })
   @ApiParam({ name: 'jobId', description: 'Job ID', type: 'string' })
-  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Number of executions to return' })
-  @ApiQuery({ name: 'offset', required: false, type: 'number', description: 'Number of executions to skip' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: 'number',
+    description: 'Number of executions to return',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: 'number',
+    description: 'Number of executions to skip',
+  })
   @ApiResponse({
     status: 200,
     description: 'Job executions retrieved successfully',
@@ -127,11 +134,7 @@ export class SchedulerController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ): Promise<ExecutionResponseDto[]> {
-    return this.schedulerService.getJobExecutions(
-      jobId,
-      limit || 50,
-      offset || 0,
-    );
+    return this.schedulerService.getJobExecutions(jobId, limit || 50, offset || 0);
   }
 
   @Get()
@@ -142,9 +145,7 @@ export class SchedulerController {
     description: 'Schedules retrieved successfully',
     type: [ScheduleResponseDto],
   })
-  async getSchedules(
-    @Query('jobId') jobId?: string,
-  ): Promise<ScheduleResponseDto[]> {
+  async getSchedules(@Query('jobId') jobId?: string): Promise<ScheduleResponseDto[]> {
     if (jobId) {
       // Validate UUID format
       try {
@@ -163,9 +164,7 @@ export class SchedulerController {
   @ApiParam({ name: 'scheduleId', description: 'Schedule ID', type: 'string' })
   @ApiResponse({ status: 204, description: 'Schedule cancelled successfully' })
   @ApiResponse({ status: 404, description: 'Schedule not found' })
-  async cancelSchedule(
-    @Param('scheduleId', ParseUUIDPipe) scheduleId: string,
-  ): Promise<void> {
+  async cancelSchedule(@Param('scheduleId', ParseUUIDPipe) scheduleId: string): Promise<void> {
     return this.schedulerService.cancelSchedule(scheduleId);
   }
 }

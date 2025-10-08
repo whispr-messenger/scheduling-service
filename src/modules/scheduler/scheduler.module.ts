@@ -7,12 +7,7 @@ import { QueuesModule } from '@/modules/queues/queues.module';
 import { CommonModule } from '@/common/common.module';
 
 @Module({
-  imports: [
-    ConfigModule,
-    DatabaseModule,
-    QueuesModule,
-    CommonModule,
-  ],
+  imports: [ConfigModule, DatabaseModule, QueuesModule, CommonModule],
   controllers: [SchedulerController],
   providers: [SchedulerService],
   exports: [SchedulerService],

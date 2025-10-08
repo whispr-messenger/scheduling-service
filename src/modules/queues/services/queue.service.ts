@@ -14,12 +14,7 @@ export class QueueService {
     private configService: ConfigService,
   ) {}
 
-  async addJob(
-    queueName: string,
-    jobType: string,
-    data: any,
-    options?: JobOptions,
-  ): Promise<Job> {
+  async addJob(queueName: string, jobType: string, data: any, options?: JobOptions): Promise<Job> {
     const queue = this.getQueue(queueName);
 
     const jobOptions: JobOptions = {
@@ -106,7 +101,7 @@ export class QueueService {
 
         // Also try to remove repeatable jobs
         const repeatableJobs = await queue.getRepeatableJobs();
-        const repeatableJob = repeatableJobs.find(j => j.id === jobId);
+        const repeatableJob = repeatableJobs.find((j) => j.id === jobId);
         if (repeatableJob) {
           await queue.removeRepeatable(repeatableJob.cron as any, repeatableJob.endDate as any);
           this.logger.log('Repeatable job removed from queue', {
@@ -155,14 +150,7 @@ export class QueueService {
   async getQueueStats(queueName: string): Promise<any> {
     const queue = this.getQueue(queueName);
 
-    const [
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      isPaused,
-    ] = await Promise.all([
+    const [waiting, active, completed, failed, delayed, isPaused] = await Promise.all([
       queue.getWaiting(),
       queue.getActive(),
       queue.getCompleted(),
@@ -191,9 +179,7 @@ export class QueueService {
 
   async getAllQueueStats(): Promise<any[]> {
     const queueNames = ['high-priority', 'medium-priority', 'low-priority'];
-    const stats = await Promise.all(
-      queueNames.map(name => this.getQueueStats(name))
-    );
+    const stats = await Promise.all(queueNames.map((name) => this.getQueueStats(name)));
 
     return stats;
   }

@@ -55,11 +55,7 @@ export class MetricsService {
     this.logger.log('Collecting system metrics');
 
     try {
-      const [
-        jobMetrics,
-        executionMetrics,
-        queueMetrics,
-      ] = await Promise.all([
+      const [jobMetrics, executionMetrics, queueMetrics] = await Promise.all([
         this.getJobMetrics(),
         this.getExecutionMetrics(),
         this.getQueueMetrics(),
@@ -89,13 +85,7 @@ export class MetricsService {
   }
 
   async getJobMetrics() {
-    const [
-      totalJobs,
-      activeJobs,
-      completed24h,
-      failed24h,
-      pendingJobs,
-    ] = await Promise.all([
+    const [totalJobs, activeJobs, completed24h, failed24h, pendingJobs] = await Promise.all([
       this.prisma.job.count({ where: { deletedAt: null } }),
       this.prisma.job.count({ where: { isActive: true, deletedAt: null } }),
       this.prisma.execution.count({
@@ -125,12 +115,7 @@ export class MetricsService {
   async getExecutionMetrics() {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [
-      totalExecutions,
-      successful24h,
-      failed24h,
-      avgDuration,
-    ] = await Promise.all([
+    const [totalExecutions, successful24h, failed24h, avgDuration] = await Promise.all([
       this.prisma.execution.count(),
       this.prisma.execution.count({
         where: {
@@ -170,9 +155,9 @@ export class MetricsService {
     const queueStats = await this.queueService.getAllQueueStats();
 
     const metrics = {
-      highPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'high-priority')),
-      mediumPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'medium-priority')),
-      lowPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'low-priority')),
+      highPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'high-priority')),
+      mediumPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'medium-priority')),
+      lowPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'low-priority')),
     };
 
     return metrics;
@@ -281,7 +266,8 @@ export class MetricsService {
           },
         });
 
-        const successRate = executions24h > 0 ? (successfulExecutions24h / executions24h) * 100 : 100;
+        const successRate =
+          executions24h > 0 ? (successfulExecutions24h / executions24h) * 100 : 100;
 
         return {
           id: category.id,
@@ -291,7 +277,7 @@ export class MetricsService {
           successfulExecutions24h,
           successRate: Math.round(successRate * 100) / 100,
         };
-      })
+      }),
     );
 
     return categoryMetrics;
