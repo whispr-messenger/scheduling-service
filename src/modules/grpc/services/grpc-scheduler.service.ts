@@ -76,6 +76,12 @@ export class GrpcSchedulerService {
     scheduleJobDto.startsAt = request.startsAt?.toISOString();
     scheduleJobDto.endsAt = request.endsAt?.toISOString();
 
+    // Validate the DTO
+    const validationErrors = scheduleJobDto.validate();
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
     const schedule = await this.schedulerService.scheduleJob(scheduleJobDto);
     return this.mapScheduleToGrpcResponse(schedule);
   }
