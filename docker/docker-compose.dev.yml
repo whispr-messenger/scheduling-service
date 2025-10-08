@@ -15,10 +15,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U scheduling_service -d whispr_scheduling"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - whispr-network
 
@@ -50,6 +51,11 @@ services:
       PORT: 3001
       GRPC_PORT: 50051
       DATABASE_URL: postgresql://scheduling_service:development_password@postgres:5432/whispr_scheduling
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: scheduling_service
+      DB_PASSWORD: development_password
+      DB_NAME: whispr_scheduling
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: development_password
