@@ -140,6 +140,7 @@ export class QueueService {
       name: job.name,
       data: job.data,
       opts: job.opts,
+      delay: job.opts.delay,
       progress: job.progress(),
       timestamp: job.timestamp,
       attemptsMade: job.attemptsMade,
@@ -160,16 +161,15 @@ export class QueueService {
       completed,
       failed,
       delayed,
+      isPaused,
     ] = await Promise.all([
       queue.getWaiting(),
       queue.getActive(),
       queue.getCompleted(),
       queue.getFailed(),
       queue.getDelayed(),
+      queue.isPaused(),
     ]);
-
-    // Check if queue is paused
-    const isPaused = await queue.isPaused();
 
     return {
       queueName,
