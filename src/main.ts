@@ -47,16 +47,16 @@ async function bootstrap() {
   // Swagger configuration
   if (configService.get('app.swagger.enabled')) {
     const config = new DocumentBuilder()
-      .setTitle(configService.get('app.swagger.title'))
-      .setDescription(configService.get('app.swagger.description'))
-      .setVersion(configService.get('app.swagger.version'))
+      .setTitle(configService.get('app.swagger.title') || 'API')
+      .setDescription(configService.get('app.swagger.description') || 'API Description')
+      .setVersion(configService.get('app.swagger.version') || '1.0.0')
       .addBearerAuth()
       .addTag('Scheduler', 'Job scheduling and execution')
       .addTag('Monitoring', 'Health checks and metrics')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup(configService.get('app.swagger.path'), app, document, {
+    SwaggerModule.setup(configService.get('app.swagger.path') || '/api/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },

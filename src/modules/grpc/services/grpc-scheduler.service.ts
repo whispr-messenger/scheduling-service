@@ -66,16 +66,15 @@ export class GrpcSchedulerService {
   async scheduleJob(request: ScheduleJobRequest): Promise<ScheduleResponse> {
     this.logger.log('gRPC ScheduleJob called', { jobId: request.jobId });
 
-    const scheduleJobDto: ScheduleJobDto = {
-      jobId: request.jobId,
-      scheduleType: this.mapGrpcToPrismaScheduleType(request.scheduleType),
-      cronExpression: request.cronExpression,
-      intervalSeconds: request.intervalSeconds,
-      scheduledAt: request.scheduledAt?.toISOString(),
-      timezone: request.timezone,
-      startsAt: request.startsAt?.toISOString(),
-      endsAt: request.endsAt?.toISOString(),
-    };
+    const scheduleJobDto = new ScheduleJobDto();
+    scheduleJobDto.jobId = request.jobId;
+    scheduleJobDto.scheduleType = this.mapGrpcToPrismaScheduleType(request.scheduleType);
+    scheduleJobDto.cronExpression = request.cronExpression;
+    scheduleJobDto.intervalSeconds = request.intervalSeconds;
+    scheduleJobDto.scheduledAt = request.scheduledAt?.toISOString();
+    scheduleJobDto.timezone = request.timezone;
+    scheduleJobDto.startsAt = request.startsAt?.toISOString();
+    scheduleJobDto.endsAt = request.endsAt?.toISOString();
 
     const schedule = await this.schedulerService.scheduleJob(scheduleJobDto);
     return this.mapScheduleToGrpcResponse(schedule);

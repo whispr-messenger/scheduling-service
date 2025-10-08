@@ -23,11 +23,10 @@ export class CustomHealthService extends HealthIndicator {
   ) {
     super();
     this.redis = new Redis({
-      host: this.configService.get('REDIS_HOST', 'localhost'),
-      port: this.configService.get('REDIS_PORT', 6379),
-      password: this.configService.get('REDIS_PASSWORD'),
-      db: this.configService.get('REDIS_DB', 0),
-      retryDelayOnFailover: 100,
+      host: this.configService.get<string>('redis.host') || 'localhost',
+      port: this.configService.get<number>('redis.port') || 6379,
+      password: this.configService.get<string>('redis.password'),
+      db: this.configService.get<number>('redis.db') || 0,
       enableReadyCheck: false,
       maxRetriesPerRequest: 1,
       lazyConnect: true,
@@ -52,7 +51,7 @@ export class CustomHealthService extends HealthIndicator {
 
       return this.getStatus('database', isHealthy, {
         message: isHealthy ? 'Database connection is healthy' : 'Database connection failed',
-        ...connectionInfo[0],
+        ...(Array.isArray(connectionInfo) && connectionInfo.length > 0 ? connectionInfo[0] : {}),
       });
     } catch (error) {
       this.logger.error('Database health check failed', error);
@@ -90,7 +89,7 @@ export class CustomHealthService extends HealthIndicator {
     try {
       const queueStats = await this.queueService.getAllQueueStats();
       const totalJobs = queueStats.reduce((sum, queue) => {
-        return sum + Object.values(queue.counts).reduce((a, b) => a + (b as number), 0);
+        return sum + Object.values(queue.counts).reduce((a: number, b) => a + (b as number), 0);
       }, 0);
 
       const failedJobs = queueStats.reduce((sum, queue) => sum + queue.counts.failed, 0);

@@ -2,13 +2,13 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientGrpc, Client, Transport } from '@nestjs/microservices';
 import { join } from 'path';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 
 // Messaging service interface
 export interface MessagingServiceClient {
-  sendScheduledMessage(data: SendScheduledMessageRequest): Promise<SendMessageResponse>;
-  cleanupExpiredMessages(data: CleanupRequest): Promise<CleanupResponse>;
-  healthCheck(): Promise<HealthResponse>;
+  sendScheduledMessage(data: SendScheduledMessageRequest): Observable<SendMessageResponse>;
+  cleanupExpiredMessages(data: CleanupRequest): Observable<CleanupResponse>;
+  healthCheck(): Observable<HealthResponse>;
 }
 
 export interface SendScheduledMessageRequest {
