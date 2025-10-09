@@ -47,18 +47,18 @@ services:
       dockerfile: ./docker/Dockerfile.dev
     container_name: whispr-scheduling-service
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3001
       GRPC_PORT: 50051
-      DATABASE_URL: postgresql://scheduling_service:development_password@postgres:5432/whispr_scheduling
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: scheduling_service
-      DB_PASSWORD: development_password
-      DB_NAME: whispr_scheduling
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: development_password
+      DATABASE_HOST: ${DATABASE_HOST:-postgres-dev}
+      DATABASE_PORT: ${DATABASE_INTERNAL_PORT:-5432}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-whisper_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-whisper_password}
+      DATABASE_NAME: ${DATABASE_NAME:-whispr_scheduling_dev}
+      DATABASE_SSL: false
+      REDIS_HOST: ${REDIS_HOST:-redis-dev}
+      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_DB: 0
       DEFAULT_TIMEZONE: UTC
       MAX_CONCURRENT_JOBS: 100
