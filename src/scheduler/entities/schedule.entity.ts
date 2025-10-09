@@ -27,10 +27,10 @@ export class Schedule {
   @Column({ type: 'varchar', length: 50, default: 'UTC' })
   timezone: string;
 
-  @Column({ type: 'datetime', nullable: true, name: 'start_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'start_at' })
   startAt: Date | null;
 
-  @Column({ type: 'datetime', nullable: true, name: 'end_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'end_at' })
   endAt: Date | null;
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })
@@ -44,10 +44,10 @@ export class Schedule {
   })
   status: ScheduleStatus;
 
-  @Column({ type: 'datetime', nullable: true, name: 'last_execution' })
+  @Column({ type: 'timestamp', nullable: true, name: 'last_execution' })
   lastExecution: Date | null;
 
-  @Column({ type: 'datetime', nullable: true, name: 'next_execution' })
+  @Column({ type: 'timestamp', nullable: true, name: 'next_execution' })
   @Index()
   nextExecution: Date | null;
 

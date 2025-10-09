@@ -15,24 +15,10 @@ describe('SchedulingService (e2e)', () => {
   const createdJobIds: string[] = [];
 
   beforeAll(async () => {
+    // Use AppModule directly which already contains TypeORM and Bull configuration
+    // The setup-e2e.ts file configures environment variables for PostgreSQL
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [
-        TypeOrmModule.forRoot({
-          type: 'sqlite',
-          database: ':memory:',
-          entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
-          synchronize: true,
-          dropSchema: true,
-        }),
-        BullModule.forRoot({
-          redis: {
-            host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6379'),
-            db: parseInt(process.env.REDIS_TEST_DB || '1'),
-          },
-        }),
-        AppModule,
-      ],
+      imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();

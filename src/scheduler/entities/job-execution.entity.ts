@@ -31,10 +31,10 @@ export class JobExecution {
   @Index()
   status: ExecutionStatus;
 
-  @Column({ type: 'datetime', name: 'started_at' })
+  @Column({ type: 'timestamp', name: 'started_at' })
   startedAt: Date;
 
-  @Column({ type: 'datetime', nullable: true, name: 'completed_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
   completedAt: Date | null;
 
   @Column({ type: 'int', nullable: true, name: 'duration_ms' })
