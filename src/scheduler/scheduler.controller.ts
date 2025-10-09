@@ -8,9 +8,12 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
+  ParseIntPipe,
   ValidationPipe,
   HttpStatus,
   HttpException,
+  DefaultValuePipe,
+  HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 
@@ -42,22 +45,26 @@ export class SchedulerController {
   async getJobs(
     @Query('status') status?: JobStatus,
     @Query('type') type?: string,
-    @Query('limit') limit: number = 50,
-    @Query('offset') offset: number = 0,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number = 50,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number = 0,
   ) {
-    if (status) {
-      const jobs = await this.schedulerService.getJobsByStatus(status, limit);
-      return {
-        jobs,
-        total: jobs.length,
-        limit,
-        offset,
-      };
+    let jobs;
+
+    if (status && type) {
+      // Filter by both status and type
+      jobs = await this.schedulerService.getJobsByStatus(status, limit);
+      jobs = jobs.filter(job => job.type === type);
+    } else if (status) {
+      jobs = await this.schedulerService.getJobsByStatus(status, limit);
+    } else if (type) {
+      // Filter by type only - get all pending jobs and filter by type
+      jobs = await this.schedulerService.getJobsByStatus(JobStatus.PENDING, limit);
+      jobs = jobs.filter(job => job.type === type);
+    } else {
+      // No filters - return all pending jobs with pagination
+      jobs = await this.schedulerService.getJobsByStatus(JobStatus.PENDING, limit);
     }
 
-    // For now, return all jobs with basic pagination
-    // In a real implementation, you'd add proper pagination to the service
-    const jobs = await this.schedulerService.getJobsByStatus(JobStatus.PENDING, limit);
     return {
       jobs,
       total: jobs.length,
@@ -132,6 +139,7 @@ export class SchedulerController {
   }
 
   @Post('jobs/:id/pause')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Pause job execution' })
   @ApiParam({ name: 'id', description: 'Job UUID' })
   @ApiResponse({ status: 200, description: 'Job paused successfully' })
@@ -140,6 +148,7 @@ export class SchedulerController {
   }
 
   @Post('jobs/:id/resume')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resume job execution' })
   @ApiParam({ name: 'id', description: 'Job UUID' })
   @ApiResponse({ status: 200, description: 'Job resumed successfully' })
@@ -148,6 +157,7 @@ export class SchedulerController {
   }
 
   @Post('jobs/:id/cancel')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel job execution' })
   @ApiParam({ name: 'id', description: 'Job UUID' })
   @ApiResponse({ status: 200, description: 'Job cancelled successfully' })
@@ -156,6 +166,7 @@ export class SchedulerController {
   }
 
   @Post('jobs/:id/retry')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Retry failed job' })
   @ApiParam({ name: 'id', description: 'Job UUID' })
   @ApiResponse({ status: 200, description: 'Job retry initiated' })

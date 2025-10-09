@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import * as parser from 'cron-parser';
 
 import { Job } from './entities/job.entity';
 import { Schedule } from './entities/schedule.entity';
@@ -100,6 +101,13 @@ export class SchedulerService {
     const job = await this.jobRepository.findOne({ where: { id: jobId } });
     if (!job) {
       throw new NotFoundException('Job not found');
+    }
+
+    // Validate cron expression
+    try {
+      parser.parseExpression(scheduleDto.cronExpression);
+    } catch (error) {
+      throw new BadRequestException(`Invalid cron expression: ${scheduleDto.cronExpression}`);
     }
 
     const schedule = this.scheduleRepository.create({
