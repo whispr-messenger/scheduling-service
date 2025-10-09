@@ -20,7 +20,7 @@ import {
 } from '../interfaces/scheduler.interface';
 import { CreateJobDto } from '@/modules/scheduler/dto/create-job.dto';
 import { ScheduleJobDto } from '@/modules/scheduler/dto/schedule-job.dto';
-import { Priority, ScheduleType, ExecutionStatus } from '@prisma/client';
+import { Priority, ScheduleType, ExecutionStatus } from '@/modules/scheduler/entities';
 
 @GrpcService('SchedulerService')
 @Injectable()

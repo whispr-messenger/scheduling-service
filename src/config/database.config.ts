@@ -1,8 +1,14 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { Job } from '../scheduler/entities/job.entity';
-import { Schedule } from '../scheduler/entities/schedule.entity';
-import { JobExecution } from '../scheduler/entities/job-execution.entity';
+import {
+  Job,
+  Schedule,
+  Execution,
+  JobCategory,
+  ExecutionLog,
+  RecurringJob,
+  JobDependency,
+} from '../modules/scheduler/entities';
 
 export default registerAs('database', () => ({
   url: process.env.DATABASE_URL,
@@ -31,7 +37,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => {
     username: process.env.DATABASE_USERNAME || process.env.DB_USERNAME || 'postgres',
     password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || 'postgres',
     database: process.env.DATABASE_NAME || process.env.DB_NAME || 'whispr_scheduling',
-    entities: [Job, Schedule, JobExecution],
+    entities: [Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency],
     synchronize: !isProduction, // Auto-sync schema in dev and test
     dropSchema: isTest, // Drop schema before each test run
     logging: !isProduction && !isTest ? ['error', 'warn', 'migration'] : false,

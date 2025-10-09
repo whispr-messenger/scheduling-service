@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Priority, ScheduleType, ExecutionStatus } from '@prisma/client';
+import { Priority, ScheduleType, ExecutionStatus } from '../entities/enums';
 
 export class JobResponseDto {
   @ApiProperty({
