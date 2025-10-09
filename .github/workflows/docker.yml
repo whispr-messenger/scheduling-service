@@ -21,7 +21,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/media-service
+  IMAGE_NAME: ${{ github.repository }}/scheduling-service
 
 jobs:
   # ================================
@@ -132,8 +132,8 @@ jobs:
             type=raw,value=stable,enable={{is_default_branch}}
             type=raw,value={{date 'YYYY.MM.DD'}},enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=Media Service
-            org.opencontainers.image.description=Media management microservice
+            org.opencontainers.image.title=Scheduling Service
+            org.opencontainers.image.description=Central task orchestration microservice
             org.opencontainers.image.vendor=Epitech
             org.opencontainers.image.revision=${{ github.sha }}
 
