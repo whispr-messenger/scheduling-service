@@ -6,16 +6,16 @@ services:
     image: postgres:15-alpine
     container_name: whispr-scheduling-db
     environment:
-      POSTGRES_DB: whispr_media_dev
-      POSTGRES_USER: whisper_user
-      POSTGRES_PASSWORD: whisper_password
+      POSTGRES_DB: ${DATABASE_NAME:-whispr_scheduling_dev}
+      POSTGRES_USER: ${DATABASE_USERNAME:-whisper_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-whisper_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5433:5432"
+      - "${DATABASE_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U whisper_user -d whispr_media_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-whisper_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,13 +27,13 @@ services:
   redis-dev:
     image: redis:7-alpine
     container_name: whispr-scheduling-redis
-    command: redis-server --appendonly yes --requirepass redis_password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

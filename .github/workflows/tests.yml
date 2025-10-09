@@ -41,35 +41,14 @@ jobs:
           ref: ${{ inputs.ref || github.event.client_payload.ref }}
           fetch-depth: 0
 
-      - name: Create .env.development file
-        run: |
-          cat > .env.development << 'EOF'
-          # Application
-          PORT=3000
-          NODE_ENV=test
-
-          # Database
-          DATABASE_HOST=postgres-test
-          DATABASE_PORT=5432
-          DATABASE_USERNAME=whisper_user
-          DATABASE_PASSWORD=whisper_password
-          DATABASE_NAME=whisper_media_test
-          DATABASE_SYNCHRONIZE=true
-          DATABASE_LOGGING=false
-          DATABASE_SSL=false
-
-          # Redis
-          REDIS_HOST=redis-test
-          REDIS_PORT=6379
-          REDIS_PASSWORD=redis_password
-          REDIS_DB=0
-
-          # JWT
-          JWT_SECRET=test-jwt-secret
-          JWT_EXPIRES_IN=24h
-          EOF
-
       - name: Start Docker Compose services
+        env:
+          DATABASE_NAME: whispr_scheduling_dev
+          DATABASE_USERNAME: whisper_user
+          DATABASE_PASSWORD: whisper_password
+          DATABASE_PORT: 5433
+          REDIS_PASSWORD: redis_password
+          REDIS_PORT: 6380
         run: |
           docker compose -f docker/docker-compose.dev.yml up -d postgres-dev redis-dev
 
@@ -81,9 +60,9 @@ jobs:
           sleep 3
 
           # Verify database exists, create if it doesn't
-          echo "Verifying database whispr_media_dev..."
-          docker compose -f docker/docker-compose.dev.yml exec postgres-dev psql -U whisper_user -lqt | cut -d \| -f 1 | grep -qw whispr_media_dev || \
-          docker compose -f docker/docker-compose.dev.yml exec postgres-dev createdb -U whisper_user whispr_media_dev
+          echo "Verifying database whispr_scheduling_dev..."
+          docker compose -f docker/docker-compose.dev.yml exec postgres-dev psql -U whisper_user -lqt | cut -d \| -f 1 | grep -qw whispr_scheduling_dev || \
+          docker compose -f docker/docker-compose.dev.yml exec postgres-dev createdb -U whisper_user whispr_scheduling_dev
 
           # Wait for Redis to be ready
           echo "Waiting for Redis..."
@@ -119,7 +98,7 @@ jobs:
           DATABASE_PORT: 5433
           DATABASE_USERNAME: whisper_user
           DATABASE_PASSWORD: whisper_password
-          DATABASE_NAME: whisper_media_dev
+          DATABASE_NAME: whispr_scheduling_dev
           DATABASE_SSL: false
           REDIS_HOST: localhost
           REDIS_PORT: 6380
@@ -133,7 +112,7 @@ jobs:
           DATABASE_PORT: 5433
           DATABASE_USERNAME: whisper_user
           DATABASE_PASSWORD: whisper_password
-          DATABASE_NAME: whisper_media_dev
+          DATABASE_NAME: whispr_scheduling_dev
           DATABASE_SSL: false
           REDIS_HOST: localhost
           REDIS_PORT: 6380

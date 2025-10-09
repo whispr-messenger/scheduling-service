@@ -11,7 +11,7 @@ beforeAll(async () => {
   process.env.DATABASE_PORT = process.env.DATABASE_PORT || '5433';
   process.env.DATABASE_USERNAME = process.env.DATABASE_USERNAME || 'whisper_user';
   process.env.DATABASE_PASSWORD = process.env.DATABASE_PASSWORD || 'whisper_password';
-  process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'whispr_media_dev';
+  process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'whispr_scheduling_dev';
   process.env.DATABASE_SSL = process.env.DATABASE_SSL || 'false';
 
   process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
