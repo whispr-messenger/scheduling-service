@@ -52,13 +52,13 @@ export class Job {
   @Column({ type: 'simple-json', default: {} })
   metadata: Record<string, any>;
 
-  @Column({ type: 'datetime', nullable: true, name: 'started_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'started_at' })
   startedAt: Date | null;
 
-  @Column({ type: 'datetime', nullable: true, name: 'completed_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
   completedAt: Date | null;
 
-  @Column({ type: 'datetime', nullable: true, name: 'failed_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'failed_at' })
   failedAt: Date | null;
 
   @Column({ type: 'text', nullable: true, name: 'error_message' })
@@ -67,7 +67,7 @@ export class Job {
   @Column({ type: 'simple-json', nullable: true, name: 'error_details' })
   errorDetails: Record<string, any> | null;
 
-  @Column({ type: 'datetime', nullable: true, name: 'next_retry_at' })
+  @Column({ type: 'timestamp', nullable: true, name: 'next_retry_at' })
   nextRetryAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
