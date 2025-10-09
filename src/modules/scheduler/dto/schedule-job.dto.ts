@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ScheduleType } from '@prisma/client';
+import { ScheduleType } from '../entities/enums';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { CronUtil } from '@/common/utils/cron.util';
 
