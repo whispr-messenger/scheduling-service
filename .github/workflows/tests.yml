@@ -72,9 +72,12 @@ jobs:
       - name: Start Docker Compose services
         run: |
           docker compose -f docker/docker-compose.dev.yml up -d postgres-dev redis-dev
-          # Wait for services to be healthy
-          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec postgres-dev pg_isready -U whisper_user -d whisper_media_dev; do sleep 2; done'
+          # Wait for PostgreSQL to be ready (don't check database yet as it may not exist)
+          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec postgres-dev pg_isready; do sleep 2; done'
+          # Wait for Redis to be ready
           timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec redis-dev redis-cli -a redis_password ping; do sleep 2; done'
+          # Create database if it doesn't exist (PostgreSQL container creates the database specified in POSTGRES_DB automatically)
+          echo "Database should be ready via docker-compose POSTGRES_DB environment variable"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
