@@ -122,7 +122,10 @@ export class QueueService {
       completed: schedulerCounts.completed + priorityCounts.completed + delayedCounts.completed,
       failed: schedulerCounts.failed + priorityCounts.failed + delayedCounts.failed,
       delayed: schedulerCounts.delayed + priorityCounts.delayed + delayedCounts.delayed,
-      paused: (schedulerCounts as any).paused + (priorityCounts as any).paused + (delayedCounts as any).paused,
+      paused:
+        (schedulerCounts as any).paused +
+        (priorityCounts as any).paused +
+        (delayedCounts as any).paused,
     };
 
     return {

@@ -1,39 +1,37 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
-  postgres:
+  postgres-dev:
     image: postgres:15-alpine
     container_name: whispr-scheduling-db
     environment:
-      POSTGRES_DB: whispr_scheduling
-      POSTGRES_USER: scheduling_service
-      POSTGRES_PASSWORD: development_password
+      POSTGRES_DB: ${DATABASE_NAME:-whispr_scheduling_dev}
+      POSTGRES_USER: ${DATABASE_USERNAME:-whisper_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-whisper_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5432:5432"
+      - "${DATABASE_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scheduling_service -d whispr_scheduling"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-whisper_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - whispr-network
 
   # Redis for Bull Queue
-  redis:
+  redis-dev:
     image: redis:7-alpine
     container_name: whispr-scheduling-redis
-    command: redis-server --appendonly yes --requirepass development_password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6380}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "development_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,18 +41,22 @@ services:
   # Scheduling Service
   scheduling-service:
     build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+      context: ..
+      dockerfile: ./docker/Dockerfile.dev
     container_name: whispr-scheduling-service
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3001
       GRPC_PORT: 50051
-      DATABASE_URL: postgresql://scheduling_service:development_password@postgres:5432/whispr_scheduling
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: development_password
+      DATABASE_HOST: ${DATABASE_HOST:-postgres-dev}
+      DATABASE_PORT: ${DATABASE_INTERNAL_PORT:-5432}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-whisper_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-whisper_password}
+      DATABASE_NAME: ${DATABASE_NAME:-whispr_scheduling_dev}
+      DATABASE_SSL: false
+      REDIS_HOST: ${REDIS_HOST:-redis-dev}
+      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_DB: 0
       DEFAULT_TIMEZONE: UTC
       MAX_CONCURRENT_JOBS: 100
@@ -66,12 +68,15 @@ services:
       - "3001:3001"
       - "50051:50051"
     depends_on:
-      postgres:
+      postgres-dev:
         condition: service_healthy
-      redis:
+      redis-dev:
         condition: service_healthy
     volumes:
-      - ./logs:/app/logs
+      # Mount repository root into container so source files are available for development
+      - ..:/app
+      # Keep node_modules inside the container to avoid host/permission issues
+      - /app/node_modules
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/monitoring/health"]
       interval: 30s
@@ -91,7 +96,7 @@ services:
     ports:
       - "8081:8081"
     depends_on:
-      - redis
+      - redis-dev
     networks:
       - whispr-network
     profiles:
@@ -108,7 +113,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - postgres
+      - postgres-dev
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:

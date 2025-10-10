@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   IsString,
   IsNotEmpty,
@@ -12,7 +13,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { Priority } from '@prisma/client';
+import { Priority } from '../entities/enums';
 
 export class CreateJobDto {
   @ApiProperty({
@@ -44,7 +45,13 @@ export class CreateJobDto {
   @ApiProperty({
     description: 'Target service to execute the job',
     example: 'messaging-service',
-    enum: ['messaging-service', 'notification-service', 'media-service', 'user-service', 'auth-service'],
+    enum: [
+      'messaging-service',
+      'notification-service',
+      'media-service',
+      'user-service',
+      'auth-service',
+    ],
   })
   @IsString()
   @IsNotEmpty()

@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/modules/database/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
+import { Job, Schedule, Execution, JobCategory, ExecutionStatus } from '@/modules/scheduler/entities';
 import { QueueService } from '@/modules/queues/services/queue.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
@@ -47,7 +49,14 @@ export class MetricsService {
   private startTime = Date.now();
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Job)
+    private readonly jobRepository: Repository<Job>,
+    @InjectRepository(Schedule)
+    private readonly scheduleRepository: Repository<Schedule>,
+    @InjectRepository(Execution)
+    private readonly executionRepository: Repository<Execution>,
+    @InjectRepository(JobCategory)
+    private readonly jobCategoryRepository: Repository<JobCategory>,
     private readonly queueService: QueueService,
   ) {}
 
@@ -55,17 +64,13 @@ export class MetricsService {
     this.logger.log('Collecting system metrics');
 
     try {
-      const [
-        jobMetrics,
-        executionMetrics,
-        queueMetrics,
-        systemMetrics,
-      ] = await Promise.all([
+      const [jobMetrics, executionMetrics, queueMetrics] = await Promise.all([
         this.getJobMetrics(),
         this.getExecutionMetrics(),
         this.getQueueMetrics(),
-        this.getSystemMetrics(),
       ]);
+
+      const systemMetrics = this.getSystemRuntimeMetrics();
 
       const metrics: SystemMetrics = {
         timestamp: new Date(),
@@ -89,28 +94,24 @@ export class MetricsService {
   }
 
   async getJobMetrics() {
-    const [
-      totalJobs,
-      activeJobs,
-      completed24h,
-      failed24h,
-      pendingJobs,
-    ] = await Promise.all([
-      this.prisma.job.count({ where: { deletedAt: null } }),
-      this.prisma.job.count({ where: { isActive: true, deletedAt: null } }),
-      this.prisma.execution.count({
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [totalJobs, activeJobs, completed24h, failed24h, pendingJobs] = await Promise.all([
+      this.jobRepository.count({ where: { deletedAt: IsNull() } }),
+      this.jobRepository.count({ where: { isActive: true, deletedAt: IsNull() } }),
+      this.executionRepository.count({
         where: {
-          status: 'COMPLETED',
-          startedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          status: ExecutionStatus.COMPLETED,
+          startedAt: MoreThanOrEqual(oneDayAgo),
         },
       }),
-      this.prisma.execution.count({
+      this.executionRepository.count({
         where: {
-          status: 'FAILED',
-          startedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          status: ExecutionStatus.FAILED,
+          startedAt: MoreThanOrEqual(oneDayAgo),
         },
       }),
-      this.prisma.schedule.count({ where: { isActive: true } }),
+      this.scheduleRepository.count({ where: { isActive: true } }),
     ]);
 
     return {
@@ -125,34 +126,30 @@ export class MetricsService {
   async getExecutionMetrics() {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [
-      totalExecutions,
-      successful24h,
-      failed24h,
-      avgDuration,
-    ] = await Promise.all([
-      this.prisma.execution.count(),
-      this.prisma.execution.count({
+    const [totalExecutions, successful24h, failed24h] = await Promise.all([
+      this.executionRepository.count(),
+      this.executionRepository.count({
         where: {
-          status: 'COMPLETED',
-          startedAt: { gte: oneDayAgo },
+          status: ExecutionStatus.COMPLETED,
+          startedAt: MoreThanOrEqual(oneDayAgo),
         },
       }),
-      this.prisma.execution.count({
+      this.executionRepository.count({
         where: {
-          status: 'FAILED',
-          startedAt: { gte: oneDayAgo },
+          status: ExecutionStatus.FAILED,
+          startedAt: MoreThanOrEqual(oneDayAgo),
         },
-      }),
-      this.prisma.execution.aggregate({
-        where: {
-          status: 'COMPLETED',
-          durationMs: { not: null },
-          startedAt: { gte: oneDayAgo },
-        },
-        _avg: { durationMs: true },
       }),
     ]);
+
+    // Calculate average duration using query builder
+    const avgResult = await this.executionRepository
+      .createQueryBuilder('execution')
+      .select('AVG(execution.durationMs)', 'avg')
+      .where('execution.status = :status', { status: 'COMPLETED' })
+      .andWhere('execution.durationMs IS NOT NULL')
+      .andWhere('execution.startedAt >= :startedAt', { startedAt: oneDayAgo })
+      .getRawOne();
 
     const total24h = successful24h + failed24h;
     const successRate = total24h > 0 ? (successful24h / total24h) * 100 : 100;
@@ -161,7 +158,7 @@ export class MetricsService {
       total: totalExecutions,
       successful24h,
       failed24h,
-      averageDuration: avgDuration._avg.durationMs || 0,
+      averageDuration: avgResult?.avg ? parseFloat(avgResult.avg) : 0,
       successRate: Math.round(successRate * 100) / 100,
     };
   }
@@ -170,9 +167,9 @@ export class MetricsService {
     const queueStats = await this.queueService.getAllQueueStats();
 
     const metrics = {
-      highPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'high-priority')),
-      mediumPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'medium-priority')),
-      lowPriority: this.mapQueueStats(queueStats.find(q => q.queueName === 'low-priority')),
+      highPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'high-priority')),
+      mediumPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'medium-priority')),
+      lowPriority: this.mapQueueStats(queueStats.find((q) => q.queueName === 'low-priority')),
     };
 
     return metrics;
@@ -202,7 +199,7 @@ export class MetricsService {
     };
   }
 
-  private getSystemMetrics() {
+  private getSystemRuntimeMetrics() {
     const memUsage = process.memoryUsage();
     const uptime = Date.now() - this.startTime;
 
@@ -240,58 +237,51 @@ export class MetricsService {
   }
 
   async getJobCategoryMetrics() {
-    const categories = await this.prisma.jobCategory.findMany({
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: {
-            jobs: {
-              where: {
-                deletedAt: null,
-              },
-            },
-          },
-        },
-      },
+    const categories = await this.jobCategoryRepository.find({
+      select: ['id', 'name'],
     });
 
     const categoryMetrics = await Promise.all(
       categories.map(async (category) => {
-        const executions24h = await this.prisma.execution.count({
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        // Count total jobs in category
+        const totalJobs = await this.jobRepository.count({
           where: {
-            job: {
-              categoryId: category.id,
-            },
-            startedAt: {
-              gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            },
+            categoryId: category.id,
+            deletedAt: IsNull(),
           },
         });
 
-        const successfulExecutions24h = await this.prisma.execution.count({
-          where: {
-            job: {
-              categoryId: category.id,
-            },
-            status: 'COMPLETED',
-            startedAt: {
-              gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            },
-          },
-        });
+        // Count executions in last 24h
+        const executions24h = await this.executionRepository
+          .createQueryBuilder('execution')
+          .innerJoin('execution.job', 'job')
+          .where('job.categoryId = :categoryId', { categoryId: category.id })
+          .andWhere('execution.startedAt >= :startedAt', { startedAt: oneDayAgo })
+          .getCount();
 
-        const successRate = executions24h > 0 ? (successfulExecutions24h / executions24h) * 100 : 100;
+        // Count successful executions in last 24h
+        const successfulExecutions24h = await this.executionRepository
+          .createQueryBuilder('execution')
+          .innerJoin('execution.job', 'job')
+          .where('job.categoryId = :categoryId', { categoryId: category.id })
+          .andWhere('execution.status = :status', { status: 'COMPLETED' })
+          .andWhere('execution.startedAt >= :startedAt', { startedAt: oneDayAgo })
+          .getCount();
+
+        const successRate =
+          executions24h > 0 ? (successfulExecutions24h / executions24h) * 100 : 100;
 
         return {
           id: category.id,
           name: category.name,
-          totalJobs: category._count.jobs,
+          totalJobs,
           executions24h,
           successfulExecutions24h,
           successRate: Math.round(successRate * 100) / 100,
         };
-      })
+      }),
     );
 
     return categoryMetrics;

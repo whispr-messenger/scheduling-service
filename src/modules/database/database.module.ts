@@ -1,11 +1,28 @@
 import { Module, Global } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PrismaService } from './prisma.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Job,
+  Schedule,
+  Execution,
+  JobCategory,
+  ExecutionLog,
+  RecurringJob,
+  JobDependency,
+} from '@/modules/scheduler/entities';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
-  providers: [PrismaService],
-  exports: [PrismaService],
+  imports: [
+    TypeOrmModule.forFeature([
+      Job,
+      Schedule,
+      Execution,
+      JobCategory,
+      ExecutionLog,
+      RecurringJob,
+      JobDependency,
+    ]),
+  ],
+  exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

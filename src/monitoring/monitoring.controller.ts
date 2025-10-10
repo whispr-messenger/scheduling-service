@@ -16,9 +16,7 @@ export class MonitoringController {
   @ApiOperation({ summary: 'Comprehensive health check' })
   @ApiResponse({ status: 200, description: 'Health check results' })
   check() {
-    return this.health.check([
-      () => this.monitoringService.isHealthy('scheduling-service'),
-    ]);
+    return this.health.check([() => this.monitoringService.isHealthy('scheduling-service')]);
   }
 
   @Get('status')

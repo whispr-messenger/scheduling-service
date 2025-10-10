@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
   Logger,
@@ -5,11 +6,12 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '@/modules/database/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateJobDto } from '../dto/create-job.dto';
 import { ScheduleJobDto } from '../dto/schedule-job.dto';
 import { JobResponseDto, ScheduleResponseDto, ExecutionResponseDto } from '../dto/job-response.dto';
-import { Job, Schedule, Execution, Priority, ScheduleType, ExecutionStatus } from '@prisma/client';
+import { Job, Schedule, Execution, JobCategory, Priority, ScheduleType, ExecutionStatus } from '../entities';
 import { CronUtil } from '@/common/utils/cron.util';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { RetryUtil } from '@/common/utils/retry.util';
@@ -21,7 +23,14 @@ export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Job)
+    private readonly jobRepository: Repository<Job>,
+    @InjectRepository(Schedule)
+    private readonly scheduleRepository: Repository<Schedule>,
+    @InjectRepository(Execution)
+    private readonly executionRepository: Repository<Execution>,
+    @InjectRepository(JobCategory)
+    private readonly jobCategoryRepository: Repository<JobCategory>,
     private readonly queueService: QueueService,
   ) {}
 
@@ -30,7 +39,7 @@ export class SchedulerService {
 
     try {
       // Validate category exists
-      const category = await this.prisma.jobCategory.findUnique({
+      const category = await this.jobCategoryRepository.findOne({
         where: { id: createJobDto.categoryId },
       });
 
@@ -39,23 +48,28 @@ export class SchedulerService {
       }
 
       // Apply defaults from category if not provided
-      const jobData = {
+      const job = this.jobRepository.create({
         ...createJobDto,
         priority: createJobDto.priority || category.defaultPriority,
         maxRetries: createJobDto.maxRetries ?? category.defaultMaxRetries,
         timeoutSeconds: createJobDto.timeoutSeconds ?? category.defaultTimeout,
-      };
-
-      const job = await this.prisma.job.create({
-        data: jobData,
-        include: {
-          category: true,
-        },
       });
 
-      this.logger.log('Job created successfully', { jobId: job.id, name: job.name });
+      const savedJob = await this.jobRepository.save(job);
 
-      return this.mapJobToResponse(job);
+      // Load the category relation
+      const jobWithCategory = await this.jobRepository.findOne({
+        where: { id: savedJob.id },
+        relations: ['category'],
+      });
+
+      if (!jobWithCategory) {
+        throw new InternalServerErrorException('Failed to retrieve created job');
+      }
+
+      this.logger.log('Job created successfully', { jobId: jobWithCategory.id, name: jobWithCategory.name });
+
+      return this.mapJobToResponse(jobWithCategory);
     } catch (error) {
       this.logger.error('Failed to create job', { error: error.message, dto: createJobDto });
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
@@ -76,9 +90,9 @@ export class SchedulerService {
       }
 
       // Validate job exists
-      const job = await this.prisma.job.findUnique({
+      const job = await this.jobRepository.findOne({
         where: { id: scheduleJobDto.jobId },
-        include: { category: true },
+        relations: ['category'],
       });
 
       if (!job) {
@@ -90,29 +104,29 @@ export class SchedulerService {
       }
 
       // Create schedule
-      const schedule = await this.prisma.schedule.create({
-        data: {
-          jobId: scheduleJobDto.jobId,
-          scheduleType: scheduleJobDto.scheduleType,
-          cronExpression: scheduleJobDto.cronExpression,
-          intervalSeconds: scheduleJobDto.intervalSeconds,
-          scheduledAt: scheduleJobDto.scheduledAt ? new Date(scheduleJobDto.scheduledAt) : null,
-          timezone: scheduleJobDto.timezone || 'UTC',
-          startsAt: scheduleJobDto.startsAt ? new Date(scheduleJobDto.startsAt) : null,
-          endsAt: scheduleJobDto.endsAt ? new Date(scheduleJobDto.endsAt) : null,
-        },
+      const schedule = this.scheduleRepository.create({
+        jobId: scheduleJobDto.jobId,
+        scheduleType: scheduleJobDto.scheduleType,
+        cronExpression: scheduleJobDto.cronExpression || null,
+        intervalSeconds: scheduleJobDto.intervalSeconds || null,
+        scheduledAt: scheduleJobDto.scheduledAt ? new Date(scheduleJobDto.scheduledAt) : null,
+        timezone: scheduleJobDto.timezone || 'UTC',
+        startsAt: scheduleJobDto.startsAt ? new Date(scheduleJobDto.startsAt) : null,
+        endsAt: scheduleJobDto.endsAt ? new Date(scheduleJobDto.endsAt) : null,
       });
+
+      const savedSchedule = await this.scheduleRepository.save(schedule);
 
       // Add to queue based on schedule type
-      await this.addToQueue(job, schedule);
+      await this.addToQueue(job, savedSchedule);
 
       this.logger.log('Job scheduled successfully', {
-        scheduleId: schedule.id,
+        scheduleId: savedSchedule.id,
         jobId: job.id,
-        scheduleType: schedule.scheduleType,
+        scheduleType: savedSchedule.scheduleType,
       });
 
-      return this.mapScheduleToResponse(schedule);
+      return this.mapScheduleToResponse(savedSchedule);
     } catch (error) {
       this.logger.error('Failed to schedule job', { error: error.message, dto: scheduleJobDto });
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
@@ -122,7 +136,11 @@ export class SchedulerService {
     }
   }
 
-  async executeJob(jobId: string, scheduleId?: string, correlationId?: string): Promise<ExecutionResponseDto> {
+  async executeJob(
+    jobId: string,
+    scheduleId?: string,
+    correlationId?: string,
+  ): Promise<ExecutionResponseDto> {
     const executionId = uuidv4();
     const startTime = Date.now();
 
@@ -130,26 +148,26 @@ export class SchedulerService {
       executionId,
       jobId,
       scheduleId,
-      correlationId
+      correlationId,
     });
 
     // Create execution record
-    const execution = await this.prisma.execution.create({
-      data: {
-        id: executionId,
-        jobId,
-        scheduleId,
-        status: ExecutionStatus.RUNNING,
-        correlationId: correlationId || uuidv4(),
-        startedAt: new Date(),
-      },
+    const execution = this.executionRepository.create({
+      id: executionId,
+      jobId,
+      scheduleId: scheduleId || null,
+      status: ExecutionStatus.RUNNING,
+      correlationId: correlationId || uuidv4(),
+      startedAt: new Date(),
     });
+
+    const savedExecution = await this.executionRepository.save(execution);
 
     try {
       // Get job details
-      const job = await this.prisma.job.findUnique({
+      const job = await this.jobRepository.findOne({
         where: { id: jobId },
-        include: { category: true },
+        relations: ['category'],
       });
 
       if (!job) {
@@ -157,42 +175,36 @@ export class SchedulerService {
       }
 
       // Execute job with timeout
-      const result = await this.executeWithTimeout(job, execution.timeoutSeconds * 1000);
+      const result = await this.executeWithTimeout(job, job.timeoutSeconds * 1000);
 
       // Update execution with success
       const duration = Date.now() - startTime;
-      const updatedExecution = await this.prisma.execution.update({
-        where: { id: executionId },
-        data: {
-          status: ExecutionStatus.COMPLETED,
-          completedAt: new Date(),
-          resultData: result,
-          durationMs: duration,
-        },
-      });
+      savedExecution.status = ExecutionStatus.COMPLETED;
+      savedExecution.completedAt = new Date();
+      savedExecution.resultData = result;
+      savedExecution.durationMs = duration;
+
+      const updatedExecution = await this.executionRepository.save(savedExecution);
 
       this.logger.log('Job execution completed successfully', {
         executionId,
         jobId,
-        duration
+        duration,
       });
 
       return this.mapExecutionToResponse(updatedExecution);
     } catch (error) {
       // Update execution with failure
       const duration = Date.now() - startTime;
-      const updatedExecution = await this.prisma.execution.update({
-        where: { id: executionId },
-        data: {
-          status: ExecutionStatus.FAILED,
-          failedAt: new Date(),
-          errorData: {
-            error: error.message,
-            stack: error.stack,
-          },
-          durationMs: duration,
-        },
-      });
+      savedExecution.status = ExecutionStatus.FAILED;
+      savedExecution.failedAt = new Date();
+      savedExecution.errorData = {
+        error: error.message,
+        stack: error.stack,
+      };
+      savedExecution.durationMs = duration;
+
+      const updatedExecution = await this.executionRepository.save(savedExecution);
 
       this.logger.error('Job execution failed', {
         executionId,
@@ -206,9 +218,9 @@ export class SchedulerService {
   }
 
   async getJob(jobId: string): Promise<JobResponseDto> {
-    const job = await this.prisma.job.findUnique({
+    const job = await this.jobRepository.findOne({
       where: { id: jobId },
-      include: { category: true },
+      relations: ['category'],
     });
 
     if (!job) {
@@ -219,27 +231,28 @@ export class SchedulerService {
   }
 
   async getJobExecutions(jobId: string, limit = 50, offset = 0): Promise<ExecutionResponseDto[]> {
-    const executions = await this.prisma.execution.findMany({
+    const executions = await this.executionRepository.find({
       where: { jobId },
-      orderBy: { startedAt: 'desc' },
+      order: { startedAt: 'DESC' },
       take: limit,
       skip: offset,
     });
 
-    return executions.map(execution => this.mapExecutionToResponse(execution));
+    return executions.map((execution) => this.mapExecutionToResponse(execution));
   }
 
   async getSchedules(jobId?: string): Promise<ScheduleResponseDto[]> {
-    const schedules = await this.prisma.schedule.findMany({
-      where: jobId ? { jobId } : undefined,
-      orderBy: { createdAt: 'desc' },
+    const whereCondition = jobId ? { jobId } : {};
+    const schedules = await this.scheduleRepository.find({
+      where: whereCondition,
+      order: { createdAt: 'DESC' },
     });
 
-    return schedules.map(schedule => this.mapScheduleToResponse(schedule));
+    return schedules.map((schedule) => this.mapScheduleToResponse(schedule));
   }
 
   async cancelSchedule(scheduleId: string): Promise<void> {
-    const schedule = await this.prisma.schedule.findUnique({
+    const schedule = await this.scheduleRepository.findOne({
       where: { id: scheduleId },
     });
 
@@ -247,10 +260,8 @@ export class SchedulerService {
       throw new NotFoundException(`Schedule with ID ${scheduleId} not found`);
     }
 
-    await this.prisma.schedule.update({
-      where: { id: scheduleId },
-      data: { isActive: false },
-    });
+    schedule.isActive = false;
+    await this.scheduleRepository.save(schedule);
 
     // Remove from queue
     await this.queueService.removeJob(scheduleId);
@@ -272,35 +283,54 @@ export class SchedulerService {
       case ScheduleType.ONCE:
         if (schedule.scheduledAt) {
           const delay = schedule.scheduledAt.getTime() - Date.now();
-          await this.queueService.addJob(queueName, 'execute-job', {
-            jobId: job.id,
-            scheduleId: schedule.id,
-          }, {
-            delay: Math.max(0, delay),
-            jobId: schedule.id,
-          });
+          await this.queueService.addJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              delay: Math.max(0, delay),
+              jobId: schedule.id,
+            },
+          );
         }
         break;
 
       case ScheduleType.CRON:
-        await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-          jobId: job.id,
-          scheduleId: schedule.id,
-        }, {
-          cron: schedule.cronExpression!,
-          tz: schedule.timezone,
-          jobId: schedule.id,
-        });
+        if (schedule.cronExpression) {
+          await this.queueService.addRepeatableJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              cron: schedule.cronExpression,
+              tz: schedule.timezone,
+              jobId: schedule.id,
+            } as any,
+          );
+        }
         break;
 
       case ScheduleType.INTERVAL:
-        await this.queueService.addRepeatableJob(queueName, 'execute-job', {
-          jobId: job.id,
-          scheduleId: schedule.id,
-        }, {
-          every: schedule.intervalSeconds! * 1000,
-          jobId: schedule.id,
-        });
+        if (schedule.intervalSeconds) {
+          await this.queueService.addRepeatableJob(
+            queueName,
+            'execute-job',
+            {
+              jobId: job.id,
+              scheduleId: schedule.id,
+            },
+            {
+              every: schedule.intervalSeconds * 1000,
+              jobId: schedule.id,
+            } as any,
+          );
+        }
         break;
     }
   }
@@ -344,7 +374,7 @@ export class SchedulerService {
     return {
       id: job.id,
       name: job.name,
-      description: job.description,
+      description: job.description ?? undefined,
       categoryId: job.categoryId,
       targetService: job.targetService,
       targetMethod: job.targetMethod,
@@ -353,10 +383,10 @@ export class SchedulerService {
       maxRetries: job.maxRetries,
       timeoutSeconds: job.timeoutSeconds,
       isActive: job.isActive,
-      createdBy: job.createdBy,
+      createdBy: job.createdBy ?? undefined,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
-      deletedAt: job.deletedAt,
+      deletedAt: job.deletedAt ?? undefined,
     };
   }
 
@@ -365,12 +395,12 @@ export class SchedulerService {
       id: schedule.id,
       jobId: schedule.jobId,
       scheduleType: schedule.scheduleType,
-      cronExpression: schedule.cronExpression,
-      intervalSeconds: schedule.intervalSeconds,
-      scheduledAt: schedule.scheduledAt,
+      cronExpression: schedule.cronExpression ?? undefined,
+      intervalSeconds: schedule.intervalSeconds ?? undefined,
+      scheduledAt: schedule.scheduledAt ?? undefined,
       timezone: schedule.timezone,
-      startsAt: schedule.startsAt,
-      endsAt: schedule.endsAt,
+      startsAt: schedule.startsAt ?? undefined,
+      endsAt: schedule.endsAt ?? undefined,
       isActive: schedule.isActive,
       createdAt: schedule.createdAt,
       updatedAt: schedule.updatedAt,
@@ -381,17 +411,17 @@ export class SchedulerService {
     return {
       id: execution.id,
       jobId: execution.jobId,
-      scheduleId: execution.scheduleId,
+      scheduleId: execution.scheduleId ?? undefined,
       status: execution.status,
       startedAt: execution.startedAt,
-      completedAt: execution.completedAt,
-      failedAt: execution.failedAt,
+      completedAt: execution.completedAt ?? undefined,
+      failedAt: execution.failedAt ?? undefined,
       attemptNumber: execution.attemptNumber,
-      resultData: execution.resultData as Record<string, any>,
-      errorData: execution.errorData as Record<string, any>,
-      durationMs: execution.durationMs,
-      workerId: execution.workerId,
-      correlationId: execution.correlationId,
+      resultData: execution.resultData as Record<string, any> | undefined,
+      errorData: execution.errorData as Record<string, any> | undefined,
+      durationMs: execution.durationMs ?? undefined,
+      workerId: execution.workerId ?? undefined,
+      correlationId: execution.correlationId ?? undefined,
       createdAt: execution.createdAt,
     };
   }

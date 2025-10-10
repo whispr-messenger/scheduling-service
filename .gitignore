@@ -106,7 +106,6 @@ out/
 
 # Docker
 .dockerignore
-Dockerfile
 
 # Database
 *.sqlite

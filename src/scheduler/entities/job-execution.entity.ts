@@ -32,7 +32,6 @@ export class JobExecution {
   status: ExecutionStatus;
 
   @Column({ type: 'timestamp', name: 'started_at' })
-  @Index()
   startedAt: Date;
 
   @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
@@ -47,10 +46,10 @@ export class JobExecution {
   @Column({ type: 'text', nullable: true, name: 'error_message' })
   errorMessage: string | null;
 
-  @Column({ type: 'jsonb', nullable: true, name: 'error_details' })
+  @Column({ type: 'simple-json', nullable: true, name: 'error_details' })
   errorDetails: Record<string, any> | null;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'simple-json', default: {} })
   metadata: Record<string, any>;
 
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'worker_id' })
@@ -65,7 +64,7 @@ export class JobExecution {
   @Column({ type: 'int', default: 0, name: 'retry_attempt' })
   retryAttempt: number;
 
-  @Column({ type: 'jsonb', nullable: true, name: 'execution_context' })
+  @Column({ type: 'simple-json', nullable: true, name: 'execution_context' })
   executionContext: Record<string, any> | null;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -14,12 +14,7 @@ export class QueueService {
     private configService: ConfigService,
   ) {}
 
-  async addJob(
-    queueName: string,
-    jobType: string,
-    data: any,
-    options?: JobOptions,
-  ): Promise<Job> {
+  async addJob(queueName: string, jobType: string, data: any, options?: JobOptions): Promise<Job> {
     const queue = this.getQueue(queueName);
 
     const jobOptions: JobOptions = {
@@ -60,11 +55,14 @@ export class QueueService {
   ): Promise<Job> {
     const queue = this.getQueue(queueName);
 
+    // Extract jobId from repeatOptions to avoid type conflict
+    const { jobId: customJobId, ...repeatOpts } = repeatOptions;
+
     const jobOptions: JobOptions = {
       removeOnComplete: 50,
       removeOnFail: 100,
-      repeat: repeatOptions,
-      jobId: repeatOptions.jobId, // For tracking repeatable jobs
+      repeat: repeatOpts as any, // Cast to any to handle Bull type limitations
+      jobId: customJobId, // For tracking repeatable jobs
     };
 
     this.logger.log('Adding repeatable job to queue', {
@@ -103,9 +101,9 @@ export class QueueService {
 
         // Also try to remove repeatable jobs
         const repeatableJobs = await queue.getRepeatableJobs();
-        const repeatableJob = repeatableJobs.find(j => j.id === jobId);
+        const repeatableJob = repeatableJobs.find((j) => j.id === jobId);
         if (repeatableJob) {
-          await queue.removeRepeatable(repeatableJob.cron, repeatableJob.endDate);
+          await queue.removeRepeatable(repeatableJob.cron as any, repeatableJob.endDate as any);
           this.logger.log('Repeatable job removed from queue', {
             queueName: queue.name,
             jobId,
@@ -137,8 +135,8 @@ export class QueueService {
       name: job.name,
       data: job.data,
       opts: job.opts,
+      delay: job.opts.delay,
       progress: job.progress(),
-      delay: job.delay,
       timestamp: job.timestamp,
       attemptsMade: job.attemptsMade,
       failedReason: job.failedReason,
@@ -152,20 +150,13 @@ export class QueueService {
   async getQueueStats(queueName: string): Promise<any> {
     const queue = this.getQueue(queueName);
 
-    const [
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      paused,
-    ] = await Promise.all([
+    const [waiting, active, completed, failed, delayed, isPaused] = await Promise.all([
       queue.getWaiting(),
       queue.getActive(),
       queue.getCompleted(),
       queue.getFailed(),
       queue.getDelayed(),
-      queue.getPaused(),
+      queue.isPaused(),
     ]);
 
     return {
@@ -176,7 +167,7 @@ export class QueueService {
         completed: completed.length,
         failed: failed.length,
         delayed: delayed.length,
-        paused: paused.length,
+        paused: isPaused ? 1 : 0,
       },
       jobs: {
         waiting: waiting.slice(0, 10), // Return first 10 for preview
@@ -188,9 +179,7 @@ export class QueueService {
 
   async getAllQueueStats(): Promise<any[]> {
     const queueNames = ['high-priority', 'medium-priority', 'low-priority'];
-    const stats = await Promise.all(
-      queueNames.map(name => this.getQueueStats(name))
-    );
+    const stats = await Promise.all(queueNames.map((name) => this.getQueueStats(name)));
 
     return stats;
   }

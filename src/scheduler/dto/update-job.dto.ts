@@ -1,13 +1,4 @@
-import {
-  IsString,
-  IsObject,
-  IsOptional,
-  IsInt,
-  Min,
-  Max,
-  Length,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsObject, IsOptional, IsInt, Min, Max, Length, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { JobStatus } from '../enums';
 

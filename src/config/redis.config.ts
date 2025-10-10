@@ -3,9 +3,9 @@ import { BullModuleOptions } from '@nestjs/bull';
 
 export default registerAs('redis', () => ({
   host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+  port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD,
-  db: parseInt(process.env.REDIS_DB, 10) || 0,
+  db: parseInt(process.env.REDIS_DB || '0', 10),
   retryDelayOnFailover: 100,
   enableReadyCheck: false,
   maxRetriesPerRequest: null,
@@ -18,9 +18,9 @@ export default registerAs('redis', () => ({
 export const bullConfig: BullModuleOptions = {
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB, 10) || 0,
+    db: parseInt(process.env.REDIS_DB || '0', 10),
     keyPrefix: 'bull:whispr:',
   },
   defaultJobOptions: {

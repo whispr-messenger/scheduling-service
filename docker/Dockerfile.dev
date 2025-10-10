@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+# Install ffmpeg for media processing
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Copy application source
+COPY . .
+
+# Expose application port and debug port
+EXPOSE 3000 9229
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/api/v1/monitoring/health || exit 1
+
+# Start in development mode with debugging enabled
+CMD ["npm", "run", "start:dev"]

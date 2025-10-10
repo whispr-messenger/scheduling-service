@@ -8,10 +8,14 @@ import {
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyType = any;
+
 @Injectable()
-export class ValidationPipe implements PipeTransform<any> {
+export class ValidationPipe implements PipeTransform<AnyType> {
   private readonly logger = new Logger(ValidationPipe.name);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async transform(value: any, { metatype }: ArgumentMetadata) {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
@@ -25,7 +29,7 @@ export class ValidationPipe implements PipeTransform<any> {
     });
 
     if (errors.length > 0) {
-      const errorMessages = errors.map(error => {
+      const errorMessages = errors.map((error) => {
         const constraints = Object.values(error.constraints || {});
         return `${error.property}: ${constraints.join(', ')}`;
       });
@@ -44,7 +48,9 @@ export class ValidationPipe implements PipeTransform<any> {
     return object;
   }
 
+  // eslint-disable-next-line @typescript-eslint/ban-types
   private toValidate(metatype: Function): boolean {
+    // eslint-disable-next-line @typescript-eslint/ban-types
     const types: Function[] = [String, Boolean, Number, Array, Object];
     return !types.includes(metatype);
   }

@@ -2,13 +2,13 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientGrpc, Client, Transport } from '@nestjs/microservices';
 import { join } from 'path';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 
 // Messaging service interface
 export interface MessagingServiceClient {
-  sendScheduledMessage(data: SendScheduledMessageRequest): Promise<SendMessageResponse>;
-  cleanupExpiredMessages(data: CleanupRequest): Promise<CleanupResponse>;
-  healthCheck(): Promise<HealthResponse>;
+  sendScheduledMessage(data: SendScheduledMessageRequest): Observable<SendMessageResponse>;
+  cleanupExpiredMessages(data: CleanupRequest): Observable<CleanupResponse>;
+  healthCheck(): Observable<HealthResponse>;
 }
 
 export interface SendScheduledMessageRequest {
@@ -77,9 +77,7 @@ export class MessagingGrpcClient implements OnModuleInit {
     });
 
     try {
-      const response = await firstValueFrom(
-        this.messagingService.sendScheduledMessage(request)
-      );
+      const response = await firstValueFrom(this.messagingService.sendScheduledMessage(request));
 
       this.logger.log('Scheduled message sent successfully', {
         messageId: response.messageId,
@@ -103,9 +101,7 @@ export class MessagingGrpcClient implements OnModuleInit {
     });
 
     try {
-      const response = await firstValueFrom(
-        this.messagingService.cleanupExpiredMessages(request)
-      );
+      const response = await firstValueFrom(this.messagingService.cleanupExpiredMessages(request));
 
       this.logger.log('Message cleanup completed', {
         deletedCount: response.deletedCount,
@@ -122,9 +118,7 @@ export class MessagingGrpcClient implements OnModuleInit {
 
   async healthCheck(): Promise<HealthResponse> {
     try {
-      const response = await firstValueFrom(
-        this.messagingService.healthCheck()
-      );
+      const response = await firstValueFrom(this.messagingService.healthCheck());
 
       return response;
     } catch (error) {
