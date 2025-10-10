@@ -26,7 +26,7 @@ import { JobStatus } from './enums';
 @ApiTags('scheduler')
 @Controller('scheduler')
 export class SchedulerController {
-  constructor(private readonly schedulerService: SchedulerService) {}
+  constructor(private readonly schedulerService: SchedulerService) { }
 
   @Post('jobs')
   @ApiOperation({ summary: 'Create a new job' })
@@ -53,13 +53,13 @@ export class SchedulerController {
     if (status && type) {
       // Filter by both status and type
       jobs = await this.schedulerService.getJobsByStatus(status, limit);
-      jobs = jobs.filter(job => job.type === type);
+      jobs = jobs.filter((job) => job.type === type);
     } else if (status) {
       jobs = await this.schedulerService.getJobsByStatus(status, limit);
     } else if (type) {
       // Filter by type only - get all pending jobs and filter by type
       jobs = await this.schedulerService.getJobsByStatus(JobStatus.PENDING, limit);
-      jobs = jobs.filter(job => job.type === type);
+      jobs = jobs.filter((job) => job.type === type);
     } else {
       // No filters - return all pending jobs with pagination
       jobs = await this.schedulerService.getJobsByStatus(JobStatus.PENDING, limit);

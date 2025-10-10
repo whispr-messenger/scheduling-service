@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 // Configuration imports
 import appConfig from './config/app.config';
-import databaseConfig from './config/database.config';
+import databaseConfig, { getDatabaseConfig } from './config/database.config';
 import redisConfig from './config/redis.config';
 import schedulerConfig from './config/scheduler.config';
 
@@ -18,7 +17,6 @@ import { TerminusModule } from '@nestjs/terminus';
 import { SchedulerModule as CustomSchedulerModule } from './scheduler/scheduler.module';
 import { QueueModule } from './queues/queue.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
-import { getDatabaseConfig } from './config/database.config';
 
 // Controllers and services
 import { AppController } from './app.controller';
@@ -88,4 +86,4 @@ import { AppService } from './app.service';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
