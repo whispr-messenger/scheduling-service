@@ -5,7 +5,8 @@ import {
   HealthIndicatorResult,
   HealthIndicator,
 } from '@nestjs/terminus';
-import { PrismaService } from '@/modules/database/prisma.service';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { QueueService } from '@/modules/queues/services/queue.service';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
@@ -17,17 +18,17 @@ export class CustomHealthService extends HealthIndicator {
 
   constructor(
     private health: HealthCheckService,
-    private prisma: PrismaService,
+    @InjectDataSource()
+    private dataSource: DataSource,
     private queueService: QueueService,
     private configService: ConfigService,
   ) {
     super();
     this.redis = new Redis({
-      host: this.configService.get('REDIS_HOST', 'localhost'),
-      port: this.configService.get('REDIS_PORT', 6379),
-      password: this.configService.get('REDIS_PASSWORD'),
-      db: this.configService.get('REDIS_DB', 0),
-      retryDelayOnFailover: 100,
+      host: this.configService.get<string>('redis.host') || 'localhost',
+      port: this.configService.get<number>('redis.port') || 6379,
+      password: this.configService.get<string>('redis.password'),
+      db: this.configService.get<number>('redis.db') || 0,
       enableReadyCheck: false,
       maxRetriesPerRequest: 1,
       lazyConnect: true,
@@ -47,12 +48,34 @@ export class CustomHealthService extends HealthIndicator {
 
   async databaseHealthIndicator(): Promise<HealthIndicatorResult> {
     try {
-      const isHealthy = await this.prisma.healthCheck();
-      const connectionInfo = await this.prisma.getConnectionInfo();
+      // Check if database connection is active
+      if (!this.dataSource.isInitialized) {
+        return this.getStatus('database', false, {
+          message: 'Database connection not initialized',
+        });
+      }
+
+      // Execute simple query to verify connection
+      const result = await this.dataSource.query('SELECT 1 as result');
+      const isHealthy = result && result.length > 0 && result[0].result === 1;
+
+      // Get connection info
+      const connectionInfo = await this.dataSource.query(`
+        SELECT
+          current_database() as database,
+          current_user as "user",
+          version() as version,
+          now() as current_time
+      `);
+
+      const info =
+        Array.isArray(connectionInfo) && connectionInfo.length > 0
+          ? (connectionInfo[0] as Record<string, any>)
+          : {};
 
       return this.getStatus('database', isHealthy, {
         message: isHealthy ? 'Database connection is healthy' : 'Database connection failed',
-        ...connectionInfo[0],
+        ...info,
       });
     } catch (error) {
       this.logger.error('Database health check failed', error);
@@ -90,7 +113,7 @@ export class CustomHealthService extends HealthIndicator {
     try {
       const queueStats = await this.queueService.getAllQueueStats();
       const totalJobs = queueStats.reduce((sum, queue) => {
-        return sum + Object.values(queue.counts).reduce((a, b) => a + (b as number), 0);
+        return sum + Object.values(queue.counts).reduce((a, b) => (a as number) + (b as number), 0);
       }, 0);
 
       const failedJobs = queueStats.reduce((sum, queue) => sum + queue.counts.failed, 0);
@@ -103,7 +126,7 @@ export class CustomHealthService extends HealthIndicator {
         totalJobs,
         failedJobs,
         successRate: `${(healthRatio * 100).toFixed(2)}%`,
-        queues: queueStats.map(q => ({
+        queues: queueStats.map((q) => ({
           name: q.queueName,
           counts: q.counts,
         })),
@@ -146,7 +169,6 @@ export class CustomHealthService extends HealthIndicator {
   async diskHealthIndicator(): Promise<HealthIndicatorResult> {
     try {
       // Basic disk usage check (simplified)
-      const stats = require('fs').statSync('.');
       const isHealthy = true; // Simplified for now
 
       return this.getStatus('disk', isHealthy, {

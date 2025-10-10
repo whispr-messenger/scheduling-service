@@ -37,7 +37,7 @@ export class Job {
   @Index()
   status: JobStatus;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'simple-json' })
   payload: Record<string, any>;
 
   @Column({ type: 'int', default: 1 })
@@ -49,7 +49,7 @@ export class Job {
   @Column({ type: 'int', default: 0, name: 'retry_count' })
   retryCount: number;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'simple-json', default: {} })
   metadata: Record<string, any>;
 
   @Column({ type: 'timestamp', nullable: true, name: 'started_at' })
@@ -64,7 +64,7 @@ export class Job {
   @Column({ type: 'text', nullable: true, name: 'error_message' })
   errorMessage: string | null;
 
-  @Column({ type: 'jsonb', nullable: true, name: 'error_details' })
+  @Column({ type: 'simple-json', nullable: true, name: 'error_details' })
   errorDetails: Record<string, any> | null;
 
   @Column({ type: 'timestamp', nullable: true, name: 'next_retry_at' })

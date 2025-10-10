@@ -59,9 +59,7 @@ export class QueueController {
   @ApiOperation({ summary: 'Add job to queue' })
   @ApiResponse({ status: 201, description: 'Job added to queue' })
   @ApiResponse({ status: 400, description: 'Invalid job data' })
-  async addJob(
-    @Body(ValidationPipe) body: { data: QueueJobData; options?: QueueOptions },
-  ) {
+  async addJob(@Body(ValidationPipe) body: { data: QueueJobData; options?: QueueOptions }) {
     return this.queueService.addJob(body.data, body.options);
   }
 

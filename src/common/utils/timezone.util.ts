@@ -26,7 +26,7 @@ export class TimezoneUtil {
     }
 
     // Basic timezone conversion - in production, use a proper library like moment-timezone
-    const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const utcTime = date.getTime() + date.getTimezoneOffset() * 60000;
     const targetTime = new Date(utcTime);
 
     return targetTime;
@@ -37,7 +37,7 @@ export class TimezoneUtil {
 
     // Basic implementation - use proper timezone library in production
     const timezoneOffsets: Record<string, number> = {
-      'UTC': 0,
+      UTC: 0,
       'Europe/Paris': 1,
       'America/New_York': -5,
       'America/Los_Angeles': -8,

@@ -20,11 +20,7 @@ export class HighPriorityJobProcessor {
     });
 
     try {
-      const result = await this.schedulerService.executeJob(
-        jobId,
-        scheduleId,
-        `bull-${job.id}`,
-      );
+      const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
 
       this.logger.log('High priority job completed', {
         jobId,
@@ -61,11 +57,7 @@ export class MediumPriorityJobProcessor {
     });
 
     try {
-      const result = await this.schedulerService.executeJob(
-        jobId,
-        scheduleId,
-        `bull-${job.id}`,
-      );
+      const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
 
       this.logger.log('Medium priority job completed', {
         jobId,
@@ -102,11 +94,7 @@ export class LowPriorityJobProcessor {
     });
 
     try {
-      const result = await this.schedulerService.executeJob(
-        jobId,
-        scheduleId,
-        `bull-${job.id}`,
-      );
+      const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
 
       this.logger.log('Low priority job completed', {
         jobId,

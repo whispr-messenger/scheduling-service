@@ -1,0 +1,142 @@
+name: 🧪 Quality Assurance
+
+on:
+  repository_dispatch:
+    types: [run-tests]
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      should_deploy:
+        required: false
+        type: string
+        default: 'false'
+    secrets:
+      SONAR_TOKEN:
+        required: false
+      SONAR_HOST_URL:
+        required: false
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  test-and-quality:
+    name: 🔍 Code Analysis & Testing
+    runs-on: ubuntu-latest
+
+    steps:
+      ####################################################################################################
+      # Setup
+      ####################################################################################################
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.client_payload.ref }}
+          fetch-depth: 0
+
+      - name: Build and start Docker Compose services
+        env:
+          DATABASE_NAME: whispr_scheduling_dev
+          DATABASE_USERNAME: whisper_user
+          DATABASE_PASSWORD: whisper_password
+          DATABASE_PORT: 5433
+          DATABASE_INTERNAL_PORT: 5432
+          DATABASE_HOST: postgres-dev
+          REDIS_PASSWORD: redis_password
+          REDIS_PORT: 6380
+          REDIS_INTERNAL_PORT: 6379
+          REDIS_HOST: redis-dev
+          NODE_ENV: test
+        run: |
+          # Build the scheduling-service image
+          docker compose -f docker/docker-compose.dev.yml build scheduling-service
+
+          # Start all services (postgres, redis, and scheduling-service)
+          docker compose -f docker/docker-compose.dev.yml up -d
+
+          # Wait for PostgreSQL to be ready
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec postgres-dev pg_isready; do sleep 2; done'
+
+          # Give PostgreSQL time to initialize the database
+          sleep 3
+
+          # Verify database exists, create if it doesn't
+          echo "Verifying database whispr_scheduling_dev..."
+          docker compose -f docker/docker-compose.dev.yml exec postgres-dev psql -U whisper_user -lqt | cut -d \| -f 1 | grep -qw whispr_scheduling_dev || \
+          docker compose -f docker/docker-compose.dev.yml exec postgres-dev createdb -U whisper_user whispr_scheduling_dev
+
+          # Wait for Redis to be ready
+          echo "Waiting for Redis..."
+          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec redis-dev redis-cli -a redis_password ping 2>/dev/null | grep -q PONG; do sleep 2; done'
+
+          # Wait for scheduling-service to be ready
+          echo "Waiting for scheduling-service..."
+          timeout 120 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec scheduling-service curl -f http://localhost:3001/api/v1/monitoring/health 2>/dev/null; do sleep 5; done' || echo "Service health check timed out, continuing anyway..."
+
+          echo "All services are ready!"
+
+      ####################################################################################################
+      # Linting and Formatting
+      ####################################################################################################
+      - name: Run linting
+        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run lint
+
+      - name: Run format check
+        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npx prettier --check "src/**/*.ts"
+
+      ####################################################################################################
+      # Unit and E2E Tests
+      ####################################################################################################
+      - name: Run unit tests
+        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run test:cov
+
+      - name: Run e2e tests
+        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run test:e2e
+
+      - name: Stop Docker Compose services
+        if: always()
+        run: docker compose -f docker/docker-compose.dev.yml down -v
+
+      ####################################################################################################
+      # SonarQube Analysis (conditional on should_deploy and secrets availability)
+      ####################################################################################################
+      - name: Check SonarQube secrets
+        id: check-secrets
+        run: |
+          if [[ -n "${{ secrets.SONAR_TOKEN }}" && -n "${{ secrets.SONAR_HOST_URL }}" ]]; then
+            echo "secrets-available=true" >> $GITHUB_OUTPUT
+          else
+            echo "secrets-available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ SonarQube secrets not configured. Skipping SonarQube analysis."
+          fi
+
+      - name: SonarQube Analysis
+        if: ${{ inputs.should_deploy == 'true' && steps.check-secrets.outputs.secrets-available == 'true' }}
+        uses: sonarsource/sonarqube-scan-action@v6.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate
+        if: ${{ inputs.should_deploy == 'true' && steps.check-secrets.outputs.secrets-available == 'true' }}
+        uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella

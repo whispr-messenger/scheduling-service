@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ScheduleType } from '@prisma/client';
+import { ScheduleType } from '../entities/enums';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { CronUtil } from '@/common/utils/cron.util';
 
@@ -35,7 +35,7 @@ export class ScheduleJobDto {
     description: 'Cron expression for CRON type schedules',
     example: '0 9 * * 1',
   })
-  @ValidateIf(o => o.scheduleType === ScheduleType.CRON)
+  @ValidateIf((o) => o.scheduleType === ScheduleType.CRON)
   @IsString()
   @IsNotEmpty()
   cronExpression?: string;
@@ -45,7 +45,7 @@ export class ScheduleJobDto {
     example: 3600,
     minimum: 60,
   })
-  @ValidateIf(o => o.scheduleType === ScheduleType.INTERVAL)
+  @ValidateIf((o) => o.scheduleType === ScheduleType.INTERVAL)
   @IsInt()
   @Min(60)
   intervalSeconds?: number;
@@ -54,7 +54,7 @@ export class ScheduleJobDto {
     description: 'Specific date and time for ONCE type schedules',
     example: '2025-01-15T10:00:00Z',
   })
-  @ValidateIf(o => o.scheduleType === ScheduleType.ONCE)
+  @ValidateIf((o) => o.scheduleType === ScheduleType.ONCE)
   @IsDateString()
   scheduledAt?: string;
 

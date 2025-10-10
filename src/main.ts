@@ -4,9 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ReflectionService } from '@grpc/reflection';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -18,7 +20,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Enable CORS
+  // Enable CORS if configured
   if (configService.get('app.cors.enabled')) {
     app.enableCors({
       origin: configService.get('app.cors.origin'),
@@ -47,16 +49,16 @@ async function bootstrap() {
   // Swagger configuration
   if (configService.get('app.swagger.enabled')) {
     const config = new DocumentBuilder()
-      .setTitle(configService.get('app.swagger.title'))
-      .setDescription(configService.get('app.swagger.description'))
-      .setVersion(configService.get('app.swagger.version'))
+      .setTitle(configService.get('app.swagger.title') || 'API')
+      .setDescription(configService.get('app.swagger.description') || 'API Description')
+      .setVersion(configService.get('app.swagger.version') || '1.0.0')
       .addBearerAuth()
       .addTag('Scheduler', 'Job scheduling and execution')
       .addTag('Monitoring', 'Health checks and metrics')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup(configService.get('app.swagger.path'), app, document, {
+    SwaggerModule.setup(configService.get('app.swagger.path') || '/api/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },
@@ -65,13 +67,18 @@ async function bootstrap() {
     logger.log(`Swagger documentation available at ${configService.get('app.swagger.path')}`);
   }
 
-  // gRPC microservice
+  // Resolve .proto path for both dev (src) and prod (dist)
+  const srcProtoPath = join(process.cwd(), 'src/modules/grpc/proto/scheduler.proto');
+  const distProtoPath = join(__dirname, 'modules/grpc/proto/scheduler.proto');
+  const protoPath = existsSync(distProtoPath) ? distProtoPath : srcProtoPath;
+
+  // gRPC microservice configuration
   const grpcUrl = `${configService.get('app.grpc.host')}:${configService.get('app.grpc.port')}`;
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
       package: 'whispr.scheduler',
-      protoPath: join(__dirname, 'modules/grpc/proto/scheduler.proto'),
+      protoPath,
       url: grpcUrl,
       loader: {
         keepCase: true,
@@ -79,6 +86,9 @@ async function bootstrap() {
         enums: String,
         defaults: true,
         oneofs: true,
+      },
+      onLoadPackageDefinition: (pkg, server) => {
+        new ReflectionService(pkg).addToServer(server);
       },
     },
   });
@@ -96,7 +106,11 @@ async function bootstrap() {
   logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
   if (configService.get('app.swagger.enabled')) {
-    logger.log(`📚 API Documentation available at http://localhost:${port}${configService.get('app.swagger.path')}`);
+    logger.log(
+      `📚 API Documentation available at http://localhost:${port}${configService.get(
+        'app.swagger.path',
+      )}`,
+    );
   }
 
   // Graceful shutdown

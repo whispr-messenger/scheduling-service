@@ -87,15 +87,6 @@ export class CreateJobDto {
   metadata?: Record<string, any>;
 }
 
-export class CreateJobWithScheduleDto extends CreateJobDto {
-  @ApiProperty({
-    description: 'Schedule configuration for the job',
-  })
-  @ValidateNested()
-  @Type(() => CreateScheduleInlineDto)
-  schedule: CreateScheduleInlineDto;
-}
-
 export class CreateScheduleInlineDto {
   @ApiProperty({
     description: 'Cron expression for scheduling',
@@ -151,4 +142,13 @@ export class CreateScheduleInlineDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+}
+
+export class CreateJobWithScheduleDto extends CreateJobDto {
+  @ApiProperty({
+    description: 'Schedule configuration for the job',
+  })
+  @ValidateNested()
+  @Type(() => CreateScheduleInlineDto)
+  schedule: CreateScheduleInlineDto;
 }

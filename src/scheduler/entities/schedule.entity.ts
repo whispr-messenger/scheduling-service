@@ -57,7 +57,7 @@ export class Schedule {
   @Column({ type: 'int', nullable: true, name: 'max_executions' })
   maxExecutions: number | null;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'simple-json', default: {} })
   metadata: Record<string, any>;
 
   @CreateDateColumn({ name: 'created_at' })
@@ -179,8 +179,8 @@ export class Schedule {
     const now = new Date();
     return Boolean(
       this.status === ScheduleStatus.EXPIRED ||
-      (this.endAt && now > this.endAt) ||
-      (this.maxExecutions && this.executionCount >= this.maxExecutions)
+        (this.endAt && now > this.endAt) ||
+        (this.maxExecutions && this.executionCount >= this.maxExecutions),
     );
   }
 

@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 // Configuration imports
 import appConfig from './config/app.config';
-import databaseConfig from './config/database.config';
+import databaseConfig, { getDatabaseConfig } from './config/database.config';
 import redisConfig from './config/redis.config';
 import schedulerConfig from './config/scheduler.config';
 
@@ -18,7 +17,6 @@ import { TerminusModule } from '@nestjs/terminus';
 import { SchedulerModule as CustomSchedulerModule } from './scheduler/scheduler.module';
 import { QueueModule } from './queues/queue.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
-import { getDatabaseConfig } from './config/database.config';
 
 // Controllers and services
 import { AppController } from './app.controller';
@@ -39,8 +37,12 @@ import { AppService } from './app.service';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: () => ({
-        ttl: 60, // 1 minute
-        limit: 100, // 100 requests per minute per IP
+        throttlers: [
+          {
+            ttl: 60000, // 1 minute in milliseconds
+            limit: 100, // 100 requests per minute per IP
+          },
+        ],
       }),
     }),
 
@@ -59,9 +61,9 @@ import { AppService } from './app.service';
       useFactory: () => ({
         redis: {
           host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+          port: parseInt(process.env.REDIS_PORT || '6379', 10),
           password: process.env.REDIS_PASSWORD,
-          db: parseInt(process.env.REDIS_DB, 10) || 0,
+          db: parseInt(process.env.REDIS_DB || '0', 10),
         },
       }),
     }),
@@ -84,4 +86,4 @@ import { AppService } from './app.service';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
