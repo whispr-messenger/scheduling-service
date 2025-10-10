@@ -4,9 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ReflectionService } from '@grpc/reflection';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -18,7 +20,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Enable CORS
+  // Enable CORS if configured
   if (configService.get('app.cors.enabled')) {
     app.enableCors({
       origin: configService.get('app.cors.origin'),
@@ -65,13 +67,18 @@ async function bootstrap() {
     logger.log(`Swagger documentation available at ${configService.get('app.swagger.path')}`);
   }
 
-  // gRPC microservice
+  // Resolve .proto path for both dev (src) and prod (dist)
+  const srcProtoPath = join(process.cwd(), 'src/modules/grpc/proto/scheduler.proto');
+  const distProtoPath = join(__dirname, 'modules/grpc/proto/scheduler.proto');
+  const protoPath = existsSync(distProtoPath) ? distProtoPath : srcProtoPath;
+
+  // gRPC microservice configuration
   const grpcUrl = `${configService.get('app.grpc.host')}:${configService.get('app.grpc.port')}`;
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
       package: 'whispr.scheduler',
-      protoPath: join(__dirname, 'modules/grpc/proto/scheduler.proto'),
+      protoPath,
       url: grpcUrl,
       loader: {
         keepCase: true,
@@ -79,6 +86,9 @@ async function bootstrap() {
         enums: String,
         defaults: true,
         oneofs: true,
+      },
+      onLoadPackageDefinition: (pkg, server) => {
+        new ReflectionService(pkg).addToServer(server);
       },
     },
   });
