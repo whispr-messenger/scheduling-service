@@ -40,6 +40,9 @@ RUN npm ci --only=production && \
 # Copy built application from builder
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
+# Copy .proto files from builder (they exist there)
+COPY --from=builder /app/src/modules/grpc/proto ./dist/src/modules/grpc/proto
+
 # Switch to non-root user
 USER nestjs
 
@@ -48,7 +51,6 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:3000/api/v1/monitoring/health || exit 1
 
-# Start the application
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/main.js"]
