@@ -1,0 +1,214 @@
+# Label configuration for PR auto-labeling
+# See: https://github.com/actions/labeler
+
+# ================================
+# Documentation Labels
+# ================================
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.md', 'docs/**/*']
+
+📖 documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.md', 'docs/**/*']
+
+📝 docs:readme:
+  - changed-files:
+    - any-glob-to-any-file: ['README.md', 'CONTRIBUTING.md', 'CHANGELOG.md']
+
+📐 docs:architecture:
+  - changed-files:
+    - any-glob-to-any-file: ['docs/architecture/**/*', 'docs/diagrams/**/*']
+
+🔗 docs:api:
+  - changed-files:
+    - any-glob-to-any-file: ['docs/api/**/*', 'src/**/*.swagger.ts']
+
+# ================================
+# CI/CD and DevOps Labels
+# ================================
+ci/cd:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/**/*', 'docker/**/*']
+
+⚡ devops:ci-cd:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/workflows/**/*']
+
+🐳 devops:docker:
+  - changed-files:
+    - any-glob-to-any-file: ['Dockerfile', 'docker/**/*', 'docker-compose*.yml', '.dockerignore']
+
+📜 devops:scripts:
+  - changed-files:
+    - any-glob-to-any-file: ['scripts/**/*', '**/*.sh']
+
+☸️ devops:kubernetes:
+  - changed-files:
+    - any-glob-to-any-file: ['k8s/**/*', 'kubernetes/**/*', 'helm/**/*', 'manifests/**/*']
+
+# ================================
+# Source Code Changes
+# ================================
+feature:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/*.ts', '!src/**/*.spec.ts', '!src/**/*.e2e-spec.ts']
+
+# ================================
+# Testing Labels
+# ================================
+tests:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.spec.ts', 'test/**/*', '**/*.e2e-spec.ts']
+
+🧪 tests:unit:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.spec.ts', '!**/*.e2e-spec.ts']
+
+🔬 tests:e2e:
+  - changed-files:
+    - any-glob-to-any-file: ['test/**/*', '**/*.e2e-spec.ts']
+
+🎯 tests:integration:
+  - changed-files:
+    - any-glob-to-any-file: ['test/integration/**/*']
+
+# ================================
+# Configuration Labels
+# ================================
+config:
+  - changed-files:
+    - any-glob-to-any-file: ['*.json', '*.yml', '*.yaml', '.env*', '!package.json', '!.github/**/*']
+
+⚙️ config:
+  - changed-files:
+    - any-glob-to-any-file: ['src/config/**/*', '.env*', 'config/**/*']
+
+# ================================
+# Dependencies Labels
+# ================================
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
+
+# ================================
+# Database Labels
+# ================================
+database:
+  - changed-files:
+    - any-glob-to-any-file: ['src/migrations/**/*', 'src/**/entities/**/*']
+
+🗄️ database:typeorm:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/entities/**/*', 'src/config/database.config.ts', 'src/migrations/**/*']
+
+🗄️ database:postgresql:
+  - changed-files:
+    - any-glob-to-any-file: ['src/migrations/**/*', 'src/config/database.config.ts']
+
+🗄️ type:database:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/entities/**/*', 'src/migrations/**/*']
+
+# ================================
+# Security Labels
+# ================================
+🔒 type:security:
+  - changed-files:
+    - any-glob-to-any-file: ['**/guards/**/*', '**/auth/**/*', 'src/common/filters/**/*']
+
+# ================================
+# Scheduling Service Specific Labels
+# ================================
+
+# Scheduler Core
+⏰ scheduler:
+  - changed-files:
+    - any-glob-to-any-file: ['src/modules/scheduler/**/*', 'src/scheduler/**/*']
+
+# Queue Management
+📋 queues:bull:
+  - changed-files:
+    - any-glob-to-any-file: ['src/modules/queues/**/*', 'src/queues/**/*', 'src/**/processors/**/*']
+
+# gRPC Communication
+🔗 grpc:
+  - changed-files:
+    - any-glob-to-any-file: ['src/modules/grpc/**/*', '**/*.proto', 'proto/**/*']
+
+# Monitoring
+📊 monitoring:
+  - changed-files:
+    - any-glob-to-any-file: ['src/modules/monitoring/**/*', 'src/monitoring/**/*', 'src/**/health.service.ts', 'src/**/metrics.service.ts']
+
+# Redis Cache
+💾 cache:redis:
+  - changed-files:
+    - any-glob-to-any-file: ['src/config/redis.config.ts', 'src/**/cache/**/*']
+
+# Middleware and Interceptors
+🛡️ middleware:
+  - changed-files:
+    - any-glob-to-any-file: ['src/common/interceptors/**/*', 'src/common/middleware/**/*', 'src/common/pipes/**/*']
+
+# Filters and Error Handling
+🗂️ filters:
+  - changed-files:
+    - any-glob-to-any-file: ['src/common/filters/**/*']
+
+# Retry Logic
+🔄 retry-logic:
+  - changed-files:
+    - any-glob-to-any-file: ['src/common/utils/retry.util.ts', 'src/**/retry/**/*']
+
+# Job Categories
+💬 category:messaging:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/messaging/**/*']
+
+🔔 category:notifications:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/notifications/**/*']
+
+🔧 category:maintenance:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/maintenance/**/*']
+
+🧹 category:cleanup:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/cleanup/**/*']
+
+📊 category:reports:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/reports/**/*']
+
+📈 category:analytics:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/analytics/**/*']
+
+# Schedule Types
+🕐 schedule:cron:
+  - changed-files:
+    - any-glob-to-any-file: ['src/common/utils/cron.util.ts', 'src/**/cron/**/*']
+
+⏱️ schedule:interval:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/interval/**/*']
+
+# Istio Service Mesh
+🔐 istio:mtls:
+  - changed-files:
+    - any-glob-to-any-file: ['k8s/**/mtls/**/*', 'istio/**/*']
+
+🌐 istio:traffic:
+  - changed-files:
+    - any-glob-to-any-file: ['k8s/**/virtualservice/**/*', 'k8s/**/destinationrule/**/*']
+
+📡 istio:telemetry:
+  - changed-files:
+    - any-glob-to-any-file: ['k8s/**/telemetry/**/*', 'k8s/**/metrics/**/*']
+
+# Performance
+⚡ performance:
+  - changed-files:
+    - any-glob-to-any-file: ['src/**/performance/**/*', 'src/config/scheduler.config.ts']
