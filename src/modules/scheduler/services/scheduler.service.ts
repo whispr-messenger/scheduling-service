@@ -5,6 +5,8 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +18,7 @@ import { CronUtil } from '@/common/utils/cron.util';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { RetryUtil } from '@/common/utils/retry.util';
 import { QueueService } from '@/modules/queues/services/queue.service';
+import { MessagingGrpcClient, NotificationType, MessageType } from '@/modules/grpc/clients/messaging.client';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -32,6 +35,8 @@ export class SchedulerService {
     @InjectRepository(JobCategory)
     private readonly jobCategoryRepository: Repository<JobCategory>,
     private readonly queueService: QueueService,
+    @Inject(forwardRef(() => MessagingGrpcClient))
+    private readonly messagingClient: MessagingGrpcClient,
   ) {}
 
   async createJob(createJobDto: CreateJobDto): Promise<JobResponseDto> {
@@ -336,24 +341,116 @@ export class SchedulerService {
   }
 
   private async executeWithTimeout(job: Job, timeoutMs: number): Promise<any> {
-    // This would normally call the target service via gRPC
-    // For now, we'll simulate execution
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Job execution timeout'));
-      }, timeoutMs);
-
-      // Simulate async work
-      setTimeout(() => {
-        clearTimeout(timeout);
-        resolve({
-          service: job.targetService,
-          method: job.targetMethod,
-          payload: job.payload,
-          executedAt: new Date().toISOString(),
-        });
-      }, Math.random() * 1000); // Random execution time up to 1 second
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Job execution timeout')), timeoutMs);
     });
+
+    const execution = this.executeJobByService(job);
+
+    return Promise.race([execution, timeout]);
+  }
+
+  private async executeJobByService(job: Job): Promise<any> {
+    this.logger.log('Executing job', {
+      jobId: job.id,
+      targetService: job.targetService,
+      targetMethod: job.targetMethod,
+    });
+
+    try {
+      // Route to appropriate service based on targetService
+      switch (job.targetService) {
+        case 'messaging':
+          return await this.executeMessagingJob(job);
+
+        case 'notification':
+          return await this.executeNotificationJob(job);
+
+        default:
+          this.logger.warn('Unknown target service, returning simulated result', {
+            targetService: job.targetService,
+          });
+          return {
+            service: job.targetService,
+            method: job.targetMethod,
+            payload: job.payload,
+            executedAt: new Date().toISOString(),
+            status: 'simulated',
+          };
+      }
+    } catch (error) {
+      this.logger.error('Failed to execute job by service', {
+        jobId: job.id,
+        targetService: job.targetService,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  private async executeMessagingJob(job: Job): Promise<any> {
+    const payload = job.payload as any;
+
+    switch (job.targetMethod) {
+      case 'sendScheduledMessage':
+        return await this.messagingClient.sendScheduledMessage({
+          conversationId: payload.conversationId,
+          senderId: payload.senderId,
+          messageType: payload.messageType || MessageType.TEXT,
+          content: payload.content,
+          metadata: payload.metadata,
+          scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : undefined,
+        });
+
+      case 'sendNotification':
+        return await this.messagingClient.sendNotification({
+          userId: payload.userId,
+          message: payload.message,
+          conversationId: payload.conversationId,
+          type: payload.type || NotificationType.MESSAGE,
+          metadata: payload.metadata,
+          scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : undefined,
+        });
+
+      case 'cleanupExpiredMessages':
+        return await this.messagingClient.cleanupExpiredMessages({
+          olderThan: new Date(payload.olderThan),
+          batchSize: payload.batchSize,
+        });
+
+      default:
+        throw new Error(`Unknown messaging method: ${job.targetMethod}`);
+    }
+  }
+
+  private async executeNotificationJob(job: Job): Promise<any> {
+    const payload = job.payload as any;
+
+    // For notification jobs that need to send via messaging
+    if (job.targetMethod === 'sendReminder' || job.targetMethod === 'sendAlert') {
+      return await this.messagingClient.sendNotification({
+        userId: payload.userId,
+        message: payload.message,
+        conversationId: payload.conversationId || '',
+        type: job.targetMethod === 'sendReminder'
+          ? NotificationType.REMINDER
+          : NotificationType.SYSTEM_ALERT,
+        metadata: payload.metadata,
+      });
+    }
+
+    // For other notification methods, return placeholder
+    this.logger.warn('Notification job executed with placeholder', {
+      targetMethod: job.targetMethod,
+    });
+
+    return {
+      service: 'notification',
+      method: job.targetMethod,
+      payload: job.payload,
+      executedAt: new Date().toISOString(),
+      status: 'placeholder',
+    };
   }
 
   private getQueueName(priority: Priority): string {

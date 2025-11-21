@@ -110,9 +110,68 @@ docker-compose exec scheduling-service npm run db:seed
 - `GET /monitoring/queues` - Statistiques des files
 
 ### gRPC API
-- **Port** : `50051`
+
+#### Server gRPC (Scheduling Service)
+- **Port** : `3001` (local) / `50051` (Kubernetes)
 - **Package** : `whispr.scheduler`
 - **Proto** : `src/modules/grpc/proto/scheduler.proto`
+
+##### Services Exposés
+- `CreateJob` - Créer un nouveau job
+- `GetJob` - Récupérer un job
+- `ScheduleJob` - Planifier un job
+- `ExecuteJob` - Exécuter un job
+- `CancelSchedule` - Annuler une planification
+- `HealthCheck` - Vérifier l'état du service
+- `GetMetrics` - Obtenir les métriques
+
+#### Client gRPC (Messaging Service)
+- **Port** : `4001` (local) / `50052` (Kubernetes)
+- **Package** : `whispr.messaging`
+- **Proto** : `src/modules/grpc/proto/messaging.proto`
+
+##### Méthodes Disponibles
+- `SendNotification` - Envoyer une notification (utilisé par les jobs de type reminder)
+- `SendScheduledMessage` - Envoyer un message programmé
+- `CleanupExpiredMessages` - Nettoyer les messages expirés
+- `HealthCheck` - Vérifier l'état du service
+
+#### Configuration des Ports
+
+##### Développement Local
+```env
+# Scheduling Service
+PORT=3000                         # HTTP REST API
+GRPC_PORT=3001                    # gRPC Server
+
+# Messaging Service (externe)
+MESSAGING_SERVICE_HOST=localhost
+MESSAGING_SERVICE_PORT=4001       # gRPC Client
+```
+
+##### Production Kubernetes
+```env
+# Scheduling Service
+PORT=3000
+GRPC_PORT=50051
+
+# Messaging Service (via service mesh)
+MESSAGING_SERVICE_HOST=messaging-service
+MESSAGING_SERVICE_PORT=50052
+```
+
+#### Scénarios d'Usage
+
+1. **Scheduling → Messaging** : Quand un job s'exécute (ex: reminder), le scheduling service appelle le messaging service via gRPC pour envoyer la notification
+
+2. **Messaging → Scheduling** : Quand un utilisateur veut programmer un message, le messaging service appelle le scheduling service via gRPC pour créer le job
+
+#### Graceful Degradation
+
+Les services sont conçus pour démarrer même si l'autre n'est pas disponible :
+- Si le messaging service n'est pas disponible, les jobs échoueront mais seront automatiquement retentés
+- Les logs détaillés permettent de suivre l'état de la connexion gRPC
+- Les health checks incluent l'état des connexions aux services externes
 
 ## 🔧 Configuration
 
@@ -120,11 +179,16 @@ docker-compose exec scheduling-service npm run db:seed
 
 | Variable | Description | Défaut |
 |----------|-------------|---------|
-| `PORT` | Port HTTP | 3001 |
-| `GRPC_PORT` | Port gRPC | 50051 |
+| `PORT` | Port HTTP | 3000 |
+| `GRPC_PORT` | Port gRPC server | 3001 |
+| `GRPC_HOST` | Host gRPC server | 0.0.0.0 |
 | `DATABASE_URL` | URL PostgreSQL | - |
 | `REDIS_HOST` | Host Redis | localhost |
 | `REDIS_PORT` | Port Redis | 6379 |
+| `MESSAGING_SERVICE_HOST` | Host messaging service | localhost |
+| `MESSAGING_SERVICE_PORT` | Port messaging service gRPC | 4001 |
+| `NOTIFICATION_SERVICE_HOST` | Host notification service | localhost |
+| `NOTIFICATION_SERVICE_PORT` | Port notification service gRPC | 4002 |
 | `MAX_CONCURRENT_JOBS` | Jobs simultanés max | 100 |
 | `DEFAULT_TIMEZONE` | Timezone par défaut | UTC |
 
@@ -255,6 +319,165 @@ CORS_ENABLED=false
 - **Certificate rotation** : Automatique via SPIFFE
 - **Network policies** : Trafic restreint
 - **Service identity** : Vérification SPIFFE/SPIRE
+
+## 📚 Exemples d'Usage
+
+### Créer un Job de Notification avec Planification
+
+```bash
+# Étape 1: Créer le job
+curl -X POST http://localhost:3000/api/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Daily Reminder",
+    "description": "Send daily reminder to user",
+    "categoryId": "<messaging_category_id>",
+    "targetService": "messaging",
+    "targetMethod": "sendNotification",
+    "payload": {
+      "userId": "user-123",
+      "message": "N'\''oubliez pas votre rendez-vous!",
+      "conversationId": "conv-456",
+      "type": 2,
+      "metadata": {
+        "source": "scheduler",
+        "priority": "high"
+      }
+    },
+    "priority": "HIGH",
+    "maxRetries": 3,
+    "timeoutSeconds": 30
+  }'
+
+# Réponse: { "id": "job-789", ... }
+
+# Étape 2: Planifier le job
+curl -X POST http://localhost:3000/api/v1/jobs/job-789/schedule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scheduleType": "CRON",
+    "cronExpression": "0 9 * * *",
+    "timezone": "Europe/Paris"
+  }'
+```
+
+### Envoyer un Message Programmé
+
+```bash
+# Créer un job pour envoyer un message à une date précise
+curl -X POST http://localhost:3000/api/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Scheduled Birthday Message",
+    "categoryId": "<messaging_category_id>",
+    "targetService": "messaging",
+    "targetMethod": "sendScheduledMessage",
+    "payload": {
+      "conversationId": "conv-123",
+      "senderId": "user-456",
+      "messageType": 1,
+      "content": "Joyeux anniversaire!",
+      "metadata": {
+        "occasion": "birthday"
+      }
+    },
+    "priority": "MEDIUM"
+  }'
+
+# Planifier pour une date spécifique
+curl -X POST http://localhost:3000/api/v1/jobs/<job-id>/schedule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scheduleType": "ONCE",
+    "scheduledAt": "2024-12-25T09:00:00Z",
+    "timezone": "UTC"
+  }'
+```
+
+### Vérifier l'État du Service
+
+```bash
+# Health check REST
+curl http://localhost:3000/api/v1/monitoring/health
+
+# Métriques
+curl http://localhost:3000/api/v1/monitoring/metrics
+
+# État des files d'attente
+curl http://localhost:3000/api/v1/monitoring/queues
+```
+
+### Tester la Communication gRPC
+
+Pour tester la communication gRPC entre les services, utilisez `grpcurl` :
+
+```bash
+# Installer grpcurl
+# macOS: brew install grpcurl
+# Linux: apt-get install grpcurl
+
+# Lister les services disponibles
+grpcurl -plaintext localhost:3001 list
+
+# Appeler HealthCheck
+grpcurl -plaintext localhost:3001 whispr.scheduler.SchedulerService/HealthCheck
+
+# Créer un job via gRPC
+grpcurl -plaintext -d '{
+  "name": "Test Job",
+  "categoryId": "cat-123",
+  "targetService": "messaging",
+  "targetMethod": "sendNotification",
+  "payload": "{\"userId\":\"user-123\",\"message\":\"Test\"}",
+  "priority": "MEDIUM"
+}' localhost:3001 whispr.scheduler.SchedulerService/CreateJob
+```
+
+### Intégration depuis un Service Elixir (Messaging)
+
+Exemple pour appeler le scheduling service depuis Elixir :
+
+```elixir
+# Dans votre service Elixir
+defmodule WhisprMessaging.GrpcClients.SchedulingClient do
+  @moduledoc """
+  Client gRPC pour communiquer avec le Scheduling Service
+  """
+
+  def create_scheduled_message(user_id, message, conversation_id, scheduled_at) do
+    # Créer le job
+    job_request = %{
+      name: "Scheduled Message",
+      category_id: get_messaging_category_id(),
+      target_service: "messaging",
+      target_method: "sendScheduledMessage",
+      payload: Jason.encode!(%{
+        user_id: user_id,
+        message: message,
+        conversation_id: conversation_id
+      }),
+      priority: :HIGH
+    }
+
+    with {:ok, job} <- SchedulerService.Stub.create_job(channel(), job_request),
+         schedule_request = %{
+           job_id: job.id,
+           schedule_type: :ONCE,
+           scheduled_at: scheduled_at,
+           timezone: "UTC"
+         },
+         {:ok, schedule} <- SchedulerService.Stub.schedule_job(channel(), schedule_request) do
+      {:ok, schedule}
+    end
+  end
+
+  defp channel do
+    # Obtenir le channel gRPC configuré
+    # En dev: localhost:3001
+    # En prod: scheduling-service:50051
+  end
+end
+```
 
 ## 🤝 Contributing
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
@@ -15,12 +15,12 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
       {
         name: 'MESSAGING_SERVICE',
         imports: [ConfigModule],
-        useFactory: async () => ({
+        useFactory: async (configService) => ({
           transport: Transport.GRPC,
           options: {
             package: 'whispr.messaging',
             protoPath: join(__dirname, 'proto/messaging.proto'),
-            url: 'messaging-service:50052',
+            url: `${configService.get('app.services.messaging.host')}:${configService.get('app.services.messaging.port')}`,
             loader: {
               keepCase: true,
               longs: String,
@@ -30,16 +30,17 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
             },
           },
         }),
+        inject: ['ConfigService'],
       },
       {
         name: 'NOTIFICATION_SERVICE',
         imports: [ConfigModule],
-        useFactory: async () => ({
+        useFactory: async (configService) => ({
           transport: Transport.GRPC,
           options: {
             package: 'whispr.notification',
             protoPath: join(__dirname, 'proto/notification.proto'),
-            url: 'notification-service:50053',
+            url: `${configService.get('app.services.notification.host')}:${configService.get('app.services.notification.port')}`,
             loader: {
               keepCase: true,
               longs: String,
@@ -49,6 +50,7 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
             },
           },
         }),
+        inject: ['ConfigService'],
       },
       {
         name: 'MEDIA_SERVICE',
@@ -108,7 +110,7 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
         }),
       },
     ]),
-    SchedulerModule,
+    forwardRef(() => SchedulerModule),
     MonitoringModule,
   ],
   providers: [GrpcSchedulerService, MessagingGrpcClient, NotificationGrpcClient],
