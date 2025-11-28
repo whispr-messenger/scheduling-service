@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailJobHandler } from '../handlers/email-job.handler';
 import { NotificationJobHandler } from '../handlers/notification-job.handler';
 import { WebhookJobHandler } from '../handlers/webhook-job.handler';
+import { JobHandler } from '../handlers/base-job.handler';
 import { ExecutionStatus } from '@prisma/client';
 
 export interface JobData {
@@ -18,8 +19,8 @@ export interface JobData {
 
 @Processor('scheduler')
 export class JobProcessor {
-  private readonly logger = new Logger(JobProcessor.name);
-  private readonly handlers: Map<string, any>;
+  protected readonly logger = new Logger(JobProcessor.name);
+  protected readonly handlers: Map<string, JobHandler>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -27,13 +28,12 @@ export class JobProcessor {
     private readonly notificationHandler: NotificationJobHandler,
     private readonly webhookHandler: WebhookJobHandler,
   ) {
-    this.handlers = new Map([
-      ['email', this.emailHandler],
-      ['notification', this.notificationHandler],
-      ['webhook', this.webhookHandler],
-      ['push_notification', this.notificationHandler],
-      ['sms', this.notificationHandler],
-    ]);
+    this.handlers = new Map<string, JobHandler>();
+    this.handlers.set('email', this.emailHandler);
+    this.handlers.set('notification', this.notificationHandler);
+    this.handlers.set('webhook', this.webhookHandler);
+    this.handlers.set('push_notification', this.notificationHandler);
+    this.handlers.set('sms', this.notificationHandler);
   }
 
   @Process('*')

@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: whispr-prod
+
+resources:
+  - ../../base
+  - pdb.yaml
+
+commonLabels:
+  environment: prod
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: scheduling-service
+      spec:
+        replicas: 3
+        template:
+          spec:
+            containers:
+              - name: scheduling-service
+                resources:
+                  requests:
+                    cpu: "500m"
+                    memory: "1Gi"
+                  limits:
+                    cpu: "2000m"
+                    memory: "2Gi"
+            topologySpreadConstraints:
+              - maxSkew: 1
+                topologyKey: topology.kubernetes.io/zone
+                whenUnsatisfiable: ScheduleAnyway
+                labelSelector:
+                  matchLabels:
+                    app: scheduling-service
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: scheduling-service
+      spec:
+        minReplicas: 3
+        maxReplicas: 20
+
+configMapGenerator:
+  - name: scheduling-service-config
+    behavior: merge
+    literals:
+      - REDIS_HOST=scheduling-redis-prod
+      - BULL_BOARD_ENABLED=false
+      - MAX_CONCURRENT_JOBS=500

@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduling-service
+  labels:
+    app: scheduling-service
+    app.kubernetes.io/name: scheduling-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: whispr
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scheduling-service
+  template:
+    metadata:
+      labels:
+        app: scheduling-service
+        app.kubernetes.io/name: scheduling-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: scheduling-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: scheduling-service
+          image: whispr/scheduling-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: grpc
+              containerPort: 3001
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "3000"
+            - name: GRPC_PORT
+              value: "3001"
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: scheduling-service-secret
+                  key: DATABASE_URL
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-service-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-service-config
+                  key: REDIS_PORT
+            - name: MESSAGING_SERVICE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-service-config
+                  key: MESSAGING_SERVICE_HOST
+            - name: MESSAGING_SERVICE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-service-config
+                  key: MESSAGING_SERVICE_PORT
+            - name: BULL_BOARD_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: scheduling-service-config
+                  key: BULL_BOARD_ENABLED
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/v1/monitoring/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/monitoring/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: scheduling-service
+                topologyKey: kubernetes.io/hostname
