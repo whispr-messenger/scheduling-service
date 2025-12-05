@@ -1,14 +1,13 @@
+---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: scheduling-service
+  name: scheduling-service-pdb
+  namespace: whispr-prod
   labels:
-    app: scheduling-service
     app.kubernetes.io/name: scheduling-service
-    app.kubernetes.io/component: backend
-    app.kubernetes.io/part-of: whispr
 spec:
-  minAvailable: 2
+  minAvailable: 1
   selector:
     matchLabels:
       app: scheduling-service

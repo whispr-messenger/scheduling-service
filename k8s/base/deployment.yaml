@@ -1,11 +1,12 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: scheduling-service
+  namespace: whispr-prod
   labels:
     app: scheduling-service
     app.kubernetes.io/name: scheduling-service
-    app.kubernetes.io/component: backend
     app.kubernetes.io/part-of: whispr
 spec:
   replicas: 2
@@ -23,6 +24,8 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: scheduling-service
+      imagePullSecrets:
+        - name: ghcr-secret
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -30,8 +33,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: scheduling-service
-          image: whispr/scheduling-service:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/whispr-messenger/scheduling-service:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000
@@ -39,65 +42,33 @@ spec:
             - name: grpc
               containerPort: 3001
               protocol: TCP
-          env:
-            - name: PORT
-              value: "3000"
-            - name: GRPC_PORT
-              value: "3001"
-            - name: NODE_ENV
-              value: "production"
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: scheduling-service-secret
-                  key: DATABASE_URL
-            - name: REDIS_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: scheduling-service-config
-                  key: REDIS_HOST
-            - name: REDIS_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: scheduling-service-config
-                  key: REDIS_PORT
-            - name: MESSAGING_SERVICE_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: scheduling-service-config
-                  key: MESSAGING_SERVICE_HOST
-            - name: MESSAGING_SERVICE_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: scheduling-service-config
-                  key: MESSAGING_SERVICE_PORT
-            - name: BULL_BOARD_ENABLED
-              valueFrom:
-                configMapKeyRef:
-                  name: scheduling-service-config
-                  key: BULL_BOARD_ENABLED
+          envFrom:
+            - configMapRef:
+                name: scheduling-service-config
+            - secretRef:
+                name: scheduling-service-secrets
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "128Mi"
             limits:
-              cpu: "1000m"
-              memory: "1Gi"
+              cpu: "500m"
+              memory: "256Mi"
           livenessProbe:
             httpGet:
-              path: /api/v1/monitoring/health
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /api/v1/monitoring/health
+              path: /health
               port: http
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
             failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false

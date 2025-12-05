@@ -1,21 +1,37 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-metadata:
-  name: scheduling-service
-
-labels:
-  - includeSelectors: true
-    pairs:
-      app.kubernetes.io/managed-by: kustomize
+namespace: whispr-prod
 
 resources:
   - serviceaccount.yaml
-  - configmap.yaml
-  - secret.yaml
   - deployment.yaml
   - service.yaml
   - hpa.yaml
+  - pdb.yaml
+  - virtualservice.yaml
+  - destinationrule.yaml
+
+configMapGenerator:
+  - name: scheduling-service-config
+    literals:
+      - NODE_ENV=production
+      - PORT=3000
+      - GRPC_PORT=3001
+      - LOG_LEVEL=info
+      - DB_POOL_SIZE=10
+      - MESSAGING_SERVICE_HOST=messaging-service.whispr-prod.svc.cluster.local
+      - MESSAGING_SERVICE_GRPC_PORT=4001
+
+# TODO: Use SealedSecrets or External Secrets Operator instead of committing secrets
+# See: https://github.com/bitnami-labs/sealed-secrets
+# Or: https://external-secrets.io/
+#
+# secretGenerator:
+#   - name: scheduling-service-secrets
+#     literals:
+#       - DATABASE_URL=postgresql://whispr:PASSWORD@postgresql.whispr-prod.svc.cluster.local:5432/whispr_scheduling
+#       - REDIS_URL=redis://redis-master.whispr-prod.svc.cluster.local:6379/1
 
 commonLabels:
   app.kubernetes.io/name: scheduling-service

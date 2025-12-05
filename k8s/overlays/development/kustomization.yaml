@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: whispr-staging
+namespace: whispr-dev
 
 resources:
   - ../../base
@@ -12,20 +12,26 @@ replicas:
 
 images:
   - name: ghcr.io/whispr-messenger/scheduling-service
-    newTag: staging
+    newTag: dev
 
 configMapGenerator:
   - name: scheduling-service-config
     behavior: merge
     literals:
       - LOG_LEVEL=debug
-      - DB_POOL_SIZE=5
+      - DB_POOL_SIZE=2
 
 patches:
   - target:
       kind: Deployment
       name: scheduling-service
     patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "50m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "64Mi"
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
         value: "128Mi"
