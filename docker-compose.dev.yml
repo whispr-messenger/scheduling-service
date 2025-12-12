@@ -41,8 +41,8 @@ services:
   # Scheduling Service
   scheduling-service:
     build:
-      context: ..
-      dockerfile: ./docker/Dockerfile.dev
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: whispr-scheduling-service
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -74,7 +74,7 @@ services:
         condition: service_healthy
     volumes:
       # Mount repository root into container so source files are available for development
-      - ..:/app
+      - .:/app
       # Keep node_modules inside the container to avoid host/permission issues
       - /app/node_modules
     healthcheck:
