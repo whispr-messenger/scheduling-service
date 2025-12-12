@@ -56,30 +56,30 @@ jobs:
           NODE_ENV: test
         run: |
           # Build the scheduling-service image
-          docker compose -f docker/docker-compose.dev.yml build scheduling-service
+          docker compose -f docker-compose.dev.yml build scheduling-service
 
           # Start all services (postgres, redis, and scheduling-service)
-          docker compose -f docker/docker-compose.dev.yml up -d
+          docker compose -f docker-compose.dev.yml up -d
 
           # Wait for PostgreSQL to be ready
           echo "Waiting for PostgreSQL..."
-          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec postgres-dev pg_isready; do sleep 2; done'
+          timeout 60 bash -c 'until docker compose -f docker-compose.dev.yml exec postgres-dev pg_isready; do sleep 2; done'
 
           # Give PostgreSQL time to initialize the database
           sleep 3
 
           # Verify database exists, create if it doesn't
           echo "Verifying database whispr_scheduling_dev..."
-          docker compose -f docker/docker-compose.dev.yml exec postgres-dev psql -U whisper_user -lqt | cut -d \| -f 1 | grep -qw whispr_scheduling_dev || \
-          docker compose -f docker/docker-compose.dev.yml exec postgres-dev createdb -U whisper_user whispr_scheduling_dev
+          docker compose -f docker-compose.dev.yml exec postgres-dev psql -U whisper_user -lqt | cut -d \| -f 1 | grep -qw whispr_scheduling_dev || \
+          docker compose -f docker-compose.dev.yml exec postgres-dev createdb -U whisper_user whispr_scheduling_dev
 
           # Wait for Redis to be ready
           echo "Waiting for Redis..."
-          timeout 60 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec redis-dev redis-cli -a redis_password ping 2>/dev/null | grep -q PONG; do sleep 2; done'
+          timeout 60 bash -c 'until docker compose -f docker-compose.dev.yml exec redis-dev redis-cli -a redis_password ping 2>/dev/null | grep -q PONG; do sleep 2; done'
 
           # Wait for scheduling-service to be ready
           echo "Waiting for scheduling-service..."
-          timeout 120 bash -c 'until docker compose -f docker/docker-compose.dev.yml exec scheduling-service curl -f http://localhost:3001/api/v1/monitoring/health 2>/dev/null; do sleep 5; done' || echo "Service health check timed out, continuing anyway..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.dev.yml exec scheduling-service curl -f http://localhost:3001/api/v1/monitoring/health 2>/dev/null; do sleep 5; done' || echo "Service health check timed out, continuing anyway..."
 
           echo "All services are ready!"
 
@@ -87,23 +87,23 @@ jobs:
       # Linting and Formatting
       ####################################################################################################
       - name: Run linting
-        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run lint
+        run: docker compose -f docker-compose.dev.yml exec scheduling-service npm run lint
 
       - name: Run format check
-        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npx prettier --check "src/**/*.ts"
+        run: docker compose -f docker-compose.dev.yml exec scheduling-service npx prettier --check "src/**/*.ts"
 
       ####################################################################################################
       # Unit and E2E Tests
       ####################################################################################################
       - name: Run unit tests
-        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run test:cov
+        run: docker compose -f docker-compose.dev.yml exec scheduling-service npm run test:cov
 
       - name: Run e2e tests
-        run: docker compose -f docker/docker-compose.dev.yml exec scheduling-service npm run test:e2e
+        run: docker compose -f docker-compose.dev.yml exec scheduling-service npm run test:e2e
 
       - name: Stop Docker Compose services
         if: always()
-        run: docker compose -f docker/docker-compose.dev.yml down -v
+        run: docker compose -f docker-compose.dev.yml down -v
 
       ####################################################################################################
       # SonarQube Analysis (conditional on should_deploy and secrets availability)
