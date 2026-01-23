@@ -1,14 +1,16 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
+import { Module, forwardRef } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { QueueService } from './services/queue.service';
 import {
   HighPriorityJobProcessor,
   MediumPriorityJobProcessor,
   LowPriorityJobProcessor,
 } from './processors/job.processor';
+import { SchedulerModule } from '../scheduler/scheduler.module';
 
 @Module({
   imports: [
+    forwardRef(() => SchedulerModule),
     BullModule.registerQueue(
       {
         name: 'high-priority',

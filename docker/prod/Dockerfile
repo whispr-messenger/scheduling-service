@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy package files (including lockfile) and install full deps for build
 COPY package*.json ./
 COPY package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 
 # Copy tsconfig and source, then build
 COPY tsconfig*.json ./
