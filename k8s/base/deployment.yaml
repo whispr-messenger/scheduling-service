@@ -25,9 +25,16 @@ spec:
       serviceAccountName: scheduling-service
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
       containers:
         - name: scheduling-service
           image: whispr/scheduling-service:latest
@@ -40,6 +47,8 @@ spec:
               containerPort: 3001
               protocol: TCP
           env:
+            - name: HTTP_PORT
+              value: "3000"
             - name: PORT
               value: "3000"
             - name: GRPC_PORT
@@ -83,19 +92,33 @@ spec:
             limits:
               cpu: "1000m"
               memory: "1Gi"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+          startupProbe:
+            httpGet:
+              path: /api/v1/monitoring/health/live
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+            successThreshold: 1
           livenessProbe:
             httpGet:
-              path: /api/v1/monitoring/health
+              path: /api/v1/monitoring/health/live
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/v1/monitoring/health
+              path: /api/v1/monitoring/health/ready
               port: http
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
