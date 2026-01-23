@@ -8,23 +8,43 @@ import {
   HttpStatus,
   UseInterceptors,
   ParseUUIDPipe,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { CustomHealthService } from '../services/health.service';
 import { MetricsService, SystemMetrics } from '../services/metrics.service';
 import { QueueService } from '@/modules/queues/services/queue.service';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 
 @ApiTags('Monitoring')
 @Controller('api/v1/monitoring')
 @UseInterceptors(LoggingInterceptor)
 export class MonitoringController {
+  private redis: Redis;
+
   constructor(
     private readonly healthService: CustomHealthService,
     private readonly metricsService: MetricsService,
     private readonly queueService: QueueService,
-  ) {}
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+  ) {
+    this.redis = new Redis({
+      host: this.configService.get<string>('redis.host') || 'localhost',
+      port: this.configService.get<number>('redis.port') || 6379,
+      password: this.configService.get<string>('redis.password'),
+      db: this.configService.get<number>('redis.db') || 0,
+      enableReadyCheck: false,
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+    });
+  }
 
   @Get('health')
   @HealthCheck()
@@ -45,6 +65,73 @@ export class MonitoringController {
   @ApiResponse({ status: 503, description: 'Service unhealthy' })
   async checkHealth(): Promise<HealthCheckResult> {
     return this.healthService.check();
+  }
+
+  @Get('health/live')
+  @ApiOperation({ summary: 'Check service liveness (Kubernetes liveness probe)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service is alive',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'alive' },
+        timestamp: { type: 'string', format: 'date-time' },
+        uptime: { type: 'number' },
+        memory: { type: 'object' },
+        version: { type: 'string' },
+      },
+    },
+  })
+  alive() {
+    return {
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.env.npm_package_version || '1.0.0',
+    };
+  }
+
+  @Get('health/ready')
+  @ApiOperation({ summary: 'Check service readiness (Kubernetes readiness probe)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service is ready',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ready' },
+        timestamp: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Service is not ready',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'not ready' },
+        error: { type: 'string' },
+      },
+    },
+  })
+  async readiness() {
+    try {
+      // Vérifier DB
+      await this.dataSource.query('SELECT 1');
+
+      // Vérifier Redis
+      await this.redis.ping();
+
+      return { status: 'ready', timestamp: new Date().toISOString() };
+    } catch (error) {
+      throw new ServiceUnavailableException({
+        status: 'not ready',
+        error: error.message,
+      });
+    }
   }
 
   @Get('status')
