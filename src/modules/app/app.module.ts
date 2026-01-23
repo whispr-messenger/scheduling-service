@@ -4,7 +4,7 @@ import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { CacheModule, CacheModuleAsyncOptions } from '@nestjs/cache-manager';
 import { ThrottlerModule, ThrottlerGuard, ThrottlerModuleOptions, ThrottlerOptions } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule, BullModuleOptions } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { MonitoringModule } from '../monitoring/monitoring.module';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 import { QueuesModule } from '../queues/queues.module';
@@ -35,16 +35,15 @@ const cacheModuleAsyncOptions: CacheModuleAsyncOptions = {
 	isGlobal: true,
 };
 
-// Bull Queue (Redis)
-const bullModuleAsyncOptions: BullModuleOptions = {
+// BullMQ Queue (Redis)
+const bullModuleAsyncOptions = {
 	imports: [ConfigModule],
 	useFactory: (configService: ConfigService) => ({
-		redis: {
+		connection: {
 			host: configService.get('REDIS_HOST', 'localhost'),
 			port: configService.get('REDIS_PORT', 6379),
 			password: configService.get('REDIS_PASSWORD'),
 			db: configService.get('REDIS_DB', 0),
-			keyPrefix: 'bull:whispr:',
 		},
 		defaultJobOptions: {
 			removeOnComplete: 50,

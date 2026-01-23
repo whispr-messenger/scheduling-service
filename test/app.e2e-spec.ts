@@ -3,12 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 
-import { AppModule } from '../src/app.module';
-import { JobType, JobStatus, JobPriority } from '../src/scheduler/enums';
-import { CreateJobDto } from '../src/scheduler/dto/create-job.dto';
-import { CreateScheduleDto } from '../src/scheduler/dto/create-schedule.dto';
+import { AppModule } from '../src/modules/app/app.module';
+import { JobType, JobStatus, JobPriority } from '../src/modules/scheduler/enums';
+import { CreateJobDto } from '../src/modules/scheduler/dto/create-job.dto';
+import { CreateScheduleDto } from '../src/modules/scheduler/dto/create-schedule.dto';
 
 describe('SchedulingService (e2e)', () => {
   let app: INestApplication;

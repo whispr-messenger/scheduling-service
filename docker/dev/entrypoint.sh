@@ -1,5 +1,5 @@
 #!/bin/bash
 
-npm install
+npm install --legacy-peer-deps
 
-npm run start:dev -- -b swc
+npm run start:dev

@@ -21,10 +21,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // Enable CORS if configured
-  if (configService.get('app.cors.enabled')) {
+  if (configService.get('CORS_ENABLED', 'true') === 'true') {
     app.enableCors({
-      origin: configService.get('app.cors.origin'),
-      credentials: configService.get('app.cors.credentials'),
+      origin: configService.get('CORS_ORIGIN', '*'),
+      credentials: true,
     });
   }
 
@@ -47,24 +47,24 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   // Swagger configuration
-  if (configService.get('app.swagger.enabled')) {
+  if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
     const config = new DocumentBuilder()
-      .setTitle(configService.get('app.swagger.title') || 'API')
-      .setDescription(configService.get('app.swagger.description') || 'API Description')
-      .setVersion(configService.get('app.swagger.version') || '1.0.0')
+      .setTitle('Whispr Scheduling Service API')
+      .setDescription('Task scheduling and orchestration service')
+      .setVersion('1.0.0')
       .addBearerAuth()
       .addTag('Scheduler', 'Job scheduling and execution')
       .addTag('Monitoring', 'Health checks and metrics')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup(configService.get('app.swagger.path') || '/api/docs', app, document, {
+    SwaggerModule.setup('/api/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },
     });
 
-    logger.log(`Swagger documentation available at ${configService.get('app.swagger.path')}`);
+    logger.log(`Swagger documentation available at /api/docs`);
   }
 
   // Resolve .proto path for both dev (src) and prod (dist)
@@ -73,7 +73,9 @@ async function bootstrap() {
   const protoPath = existsSync(distProtoPath) ? distProtoPath : srcProtoPath;
 
   // gRPC microservice configuration
-  const grpcUrl = `${configService.get('app.grpc.host')}:${configService.get('app.grpc.port')}`;
+  const grpcHost = configService.get('GRPC_HOST', '0.0.0.0');
+  const grpcPort = configService.get('GRPC_PORT', '3001');
+  const grpcUrl = `${grpcHost}:${grpcPort}`;
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
@@ -98,18 +100,16 @@ async function bootstrap() {
   logger.log(`gRPC server is listening on ${grpcUrl}`);
 
   // Start HTTP server
-  const port = configService.get('app.port');
+  const port = configService.get('PORT', '3000');
   await app.listen(port, '0.0.0.0');
 
   logger.log(`🚀 Whispr Scheduling Service is running on port ${port}`);
   logger.log(`📊 Health check available at http://localhost:${port}/api/v1/monitoring/health`);
   logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
-  if (configService.get('app.swagger.enabled')) {
+  if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
     logger.log(
-      `📚 API Documentation available at http://localhost:${port}${configService.get(
-        'app.swagger.path',
-      )}`,
+      `📚 API Documentation available at http://localhost:${port}/api/docs`,
     );
   }
 

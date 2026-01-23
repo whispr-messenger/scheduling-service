@@ -59,7 +59,7 @@ function getDataSourceOptions(configService: ConfigService): DataSourceOptions {
 		// Indicates if logging is enabled or not. If set to true then query and error logging will be enabled.
 		logging: configService.get('DB_LOGGING', 'false') === 'true',
 		// Migrations to be loaded and used for this data source
-		migrations: [__dirname + '/migrations/*{.ts,.js}'],
+		migrations: [],
 		// Indicates if migrations should be auto-run on every application launch.
 		migrationsRun: configService.get('DB_MIGRATIONS_RUN', 'false') === 'true',
 		// Indicates if database schema should be auto created on every application launch.
