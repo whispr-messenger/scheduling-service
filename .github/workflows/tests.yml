@@ -10,8 +10,8 @@ on:
         type: string
       should_deploy:
         required: false
-        type: string
-        default: 'false'
+        type: boolean
+        default: false
     secrets:
       SONAR_TOKEN:
         required: false

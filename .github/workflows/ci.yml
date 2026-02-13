@@ -41,7 +41,6 @@ jobs:
     uses: ./.github/workflows/trivy.yml
     with:
       ref: ${{ github.ref }}
-      should_deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
   # ================================
   # Docker Build
