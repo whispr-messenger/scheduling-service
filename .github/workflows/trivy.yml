@@ -8,10 +8,6 @@ on:
       ref:
         required: true
         type: string
-      should_deploy:
-        required: false
-        type: string
-        default: 'false'
 
 permissions:
   contents: read
