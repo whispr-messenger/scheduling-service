@@ -11,7 +11,7 @@ export class QueueService {
 		@InjectQueue('high-priority') private highPriorityQueue: Queue,
 		@InjectQueue('medium-priority') private mediumPriorityQueue: Queue,
 		@InjectQueue('low-priority') private lowPriorityQueue: Queue,
-		private configService: ConfigService,
+		private configService: ConfigService
 	) {}
 
 	async addJob(queueName: string, jobType: string, data: any, options?: JobsOptions): Promise<Job> {
@@ -51,7 +51,7 @@ export class QueueService {
 		queueName: string,
 		jobType: string,
 		data: any,
-		repeatOptions: { pattern?: string; every?: number; jobId?: string },
+		repeatOptions: { pattern?: string; every?: number; jobId?: string }
 	): Promise<Job> {
 		const queue = this.getQueue(queueName);
 
@@ -153,14 +153,16 @@ export class QueueService {
 	async getQueueStats(queueName: string): Promise<any> {
 		const queue = this.getQueue(queueName);
 
-		const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs, isPaused] = await Promise.all([
-			queue.getWaiting(),
-			queue.getActive(),
-			queue.getCompleted(),
-			queue.getFailed(),
-			queue.getDelayed(),
-			queue.isPaused(),
-		]);
+		const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs, isPaused] = await Promise.all(
+			[
+				queue.getWaiting(),
+				queue.getActive(),
+				queue.getCompleted(),
+				queue.getFailed(),
+				queue.getDelayed(),
+				queue.isPaused(),
+			]
+		);
 
 		return {
 			queueName,

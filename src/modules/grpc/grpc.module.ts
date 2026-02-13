@@ -8,34 +8,34 @@ import { SchedulerModule } from '@/modules/scheduler/scheduler.module';
 import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
 
 @Module({
-  imports: [
-    ConfigModule,
-    ClientsModule.registerAsync([
-      {
-        name: 'MESSAGING_SERVICE',
-        imports: [ConfigModule],
-        useFactory: async (configService: ConfigService) => ({
-          transport: Transport.GRPC,
-          options: {
-            package: 'whispr.messaging',
-            protoPath: join(__dirname, 'proto/messaging.proto'),
-            url: `${configService.get('MESSAGING_SERVICE_HOST', 'localhost')}:${configService.get('MESSAGING_SERVICE_PORT', '4001')}`,
-            loader: {
-              keepCase: true,
-              longs: String,
-              enums: String,
-              defaults: true,
-              oneofs: true,
-            },
-          },
-        }),
-        inject: [ConfigService],
-      },
-    ]),
-    forwardRef(() => SchedulerModule),
-    forwardRef(() => MonitoringModule),
-  ],
-  providers: [GrpcSchedulerService, MessagingGrpcClient],
-  exports: [GrpcSchedulerService, MessagingGrpcClient],
+	imports: [
+		ConfigModule,
+		ClientsModule.registerAsync([
+			{
+				name: 'MESSAGING_SERVICE',
+				imports: [ConfigModule],
+				useFactory: async (configService: ConfigService) => ({
+					transport: Transport.GRPC,
+					options: {
+						package: 'whispr.messaging',
+						protoPath: join(__dirname, 'proto/messaging.proto'),
+						url: `${configService.get('MESSAGING_SERVICE_HOST', 'localhost')}:${configService.get('MESSAGING_SERVICE_PORT', '4001')}`,
+						loader: {
+							keepCase: true,
+							longs: String,
+							enums: String,
+							defaults: true,
+							oneofs: true,
+						},
+					},
+				}),
+				inject: [ConfigService],
+			},
+		]),
+		forwardRef(() => SchedulerModule),
+		forwardRef(() => MonitoringModule),
+	],
+	providers: [GrpcSchedulerService, MessagingGrpcClient],
+	exports: [GrpcSchedulerService, MessagingGrpcClient],
 })
 export class GrpcModule {}

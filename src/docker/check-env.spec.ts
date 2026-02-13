@@ -103,7 +103,9 @@ describe('Environment Checks', () => {
 			// All other required variables missing
 
 			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
-			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('required environment variable(s) missing'));
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				expect.stringContaining('required environment variable(s) missing')
+			);
 		});
 	});
 
