@@ -174,7 +174,7 @@ describe('Health Check Script', () => {
 			jest.isolateModules(() => {
 				try {
 					require('./health-check');
-				} catch (e) {
+				} catch (_e) {
 					// Ignore exit error
 				}
 			});
@@ -200,7 +200,7 @@ describe('Health Check Script', () => {
 			jest.isolateModules(() => {
 				try {
 					require('./health-check');
-				} catch (e) {
+				} catch (_e) {
 					// Ignore exit error
 				}
 			});
@@ -228,7 +228,7 @@ describe('Health Check Script', () => {
 			jest.isolateModules(() => {
 				try {
 					require('./health-check');
-				} catch (e) {
+				} catch (_e) {
 					// Ignore exit error
 				}
 			});
