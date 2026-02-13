@@ -68,9 +68,7 @@ describe('Health Check Script', () => {
 				}).toThrow('process.exit(0)');
 			});
 
-			expect(consoleLogSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Health check PASSED')
-			);
+			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Health check PASSED'));
 			expect(processExitSpy).toHaveBeenCalledWith(0);
 		});
 	});
@@ -102,9 +100,7 @@ describe('Health Check Script', () => {
 				}).toThrow('process.exit(1)');
 			});
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Health check FAILED')
-			);
+			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Health check FAILED'));
 			expect(processExitSpy).toHaveBeenCalledWith(1);
 		});
 
@@ -127,9 +123,7 @@ describe('Health Check Script', () => {
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
 				expect.stringContaining('Health check FAILED: Request error')
 			);
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				expect.stringContaining('Connection refused')
-			);
+			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Connection refused'));
 			expect(processExitSpy).toHaveBeenCalledWith(1);
 		});
 
