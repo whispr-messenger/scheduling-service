@@ -24,6 +24,7 @@ jobs:
 
     permissions:
       contents: write
+      packages: read
 
     steps:
       - name: Generate GitHub App Token
@@ -33,11 +34,20 @@ jobs:
           app_id: ${{ secrets.ACTIONS_CD }}
           private_key: ${{ secrets.ACTIONS_CD_PRIVATE_KEY }}
 
-      - name: Checkout code
+      - name: Checkout scheduling-service
         uses: actions/checkout@v4
         with:
+          path: scheduling-service
           ref: main
           token: ${{ steps.generate_token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install yq
         run: |
@@ -46,6 +56,7 @@ jobs:
 
       - name: Validate and determine commit SHA
         id: validate_commit
+        working-directory: scheduling-service
         run: |
           # Determine the commit SHA based on trigger type
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -88,6 +99,42 @@ jobs:
           # Store COMMIT_SHA as output for use in subsequent steps
           echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
 
+      - name: Verify image exists in registry
+        run: |
+          COMMIT_SHA="${{ steps.validate_commit.outputs.commit_sha }}"
+          SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
+          IMAGE_TAG="sha-${SHORT_SHA}"
+          FULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          FULL_IMAGE=$(echo "${FULL_IMAGE}" | tr '[:upper:]' '[:lower:]')
+
+          echo "Verifying image existence: ${FULL_IMAGE}"
+          # We use docker manifest inspect which is available in modern docker versions
+          if ! docker manifest inspect "${FULL_IMAGE}" > /dev/null 2>&1; then
+            echo "❌ Error: Docker image ${FULL_IMAGE} not found in registry."
+            echo "The CI pipeline might have failed to build or push the image for this commit."
+            exit 1
+          fi
+          echo "✅ Image found in registry"
+
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: whispr-messenger/infrastructure
+          path: infrastructure
+          ref: main
+          token: ${{ steps.generate_token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Validate deployment manifest path
+        run: |
+          MANIFEST_PATH="infrastructure/argocd/k8s/whispr/scheduling-service/deployment.yaml"
+          if [ ! -f "$MANIFEST_PATH" ]; then
+            echo "❌ Error: Deployment manifest not found at $MANIFEST_PATH"
+            echo "Please verify the path in the infrastructure repository."
+            exit 1
+          fi
+          echo "✅ Deployment manifest found at $MANIFEST_PATH"
+
       - name: Update image tag in deployment
         id: update_image
         run: |
@@ -98,7 +145,6 @@ jobs:
           SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
 
           # Use the short SHA tag format that matches the CI docker workflow
-          # The docker.yml workflow creates tags with "type=sha,format=short" which produces: sha-<short_sha>
           IMAGE_TAG="sha-${SHORT_SHA}"
 
           # Build the full image reference with lowercase (OCI requirement)
@@ -110,40 +156,62 @@ jobs:
           echo "Image tag: $IMAGE_TAG"
           echo "Updating deployment image to: ${FULL_IMAGE}"
 
-          # Update the deployment manifest using yq
-          yq -i ".spec.template.spec.containers[0].image = \"${FULL_IMAGE}\"" k8s/base/deployment.yaml
+          # Update the deployment manifest in the infrastructure repository
+          yq -i ".spec.template.spec.containers[0].image = \"${FULL_IMAGE}\"" infrastructure/argocd/k8s/whispr/scheduling-service/deployment.yaml
 
       - name: Verify update
         run: |
           echo "Updated deployment manifest:"
-          yq '.spec.template.spec.containers[0].image' k8s/base/deployment.yaml
+          yq '.spec.template.spec.containers[0].image' infrastructure/argocd/k8s/whispr/scheduling-service/deployment.yaml
 
       - name: Commit and push changes
+        working-directory: infrastructure
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
           # Check if there are changes to commit
-          if git diff --quiet k8s/base/deployment.yaml; then
+          if git diff --quiet argocd/k8s/whispr/scheduling-service/deployment.yaml; then
             echo "No changes to commit"
             exit 0
           fi
 
           # Use the validated commit SHA determined in the previous step
           COMMIT_SHA="${{ steps.validate_commit.outputs.commit_sha }}"
+          SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
 
           # Build commit message based on trigger type
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COMMIT_MSG="🔧 chore(deploy): update deployment image to latest build
-
-          Updated by CD workflow (manual trigger) for commit: ${COMMIT_SHA}"
+            COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA} (manual trigger)"
           else
-            COMMIT_MSG="🔧 chore(deploy): update deployment image to latest build
-
-          Updated by CD workflow for commit: ${COMMIT_SHA}"
+            COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA}"
           fi
 
-          git add k8s/base/deployment.yaml
+          git add argocd/k8s/whispr/scheduling-service/deployment.yaml
           git commit -m "${COMMIT_MSG}"
 
-          git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/${{ github.repository }}.git main
+          # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
+          MAX_RETRIES=3
+          for attempt in $(seq 1 "$MAX_RETRIES"); do
+            echo "Attempt ${attempt}/${MAX_RETRIES}: pulling with rebase and pushing changes..."
+
+            if ! git pull origin main --rebase; then
+              echo "⚠️ Rebase failed, resetting and retrying..."
+              git rebase --abort 2>/dev/null || true
+              git reset --soft HEAD~1
+              git commit -m "${COMMIT_MSG}"
+              sleep $((attempt * 2))
+              continue
+            fi
+
+            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git main; then
+              echo "✅ Push successful on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "⚠️ Push failed on attempt ${attempt}, retrying..."
+            sleep $((attempt * 2))
+          done
+
+          echo "❌ Failed to push after ${MAX_RETRIES} attempts"
+          exit 1
