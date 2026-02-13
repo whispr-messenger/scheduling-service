@@ -13,7 +13,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Remove devDependencies to keep only production deps
-RUN npm prune --production
+RUN npm prune --production --legacy-peer-deps
 
 FROM gcr.io/distroless/nodejs22-debian12 AS production
 
