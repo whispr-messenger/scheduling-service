@@ -105,10 +105,21 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.interface.ts",
+      "!**/*.enum.ts",
+      "!**/*.dto.ts",
+      "!**/main.ts",
+      "!**/*.module.ts"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "roots": ["<rootDir>"],
+    "modulePaths": ["<rootDir>"],
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
+    "setupFilesAfterEnv": ["<rootDir>/../test/setup.ts"]
   },
   "prettier": {
     "trailingComma": "es5",

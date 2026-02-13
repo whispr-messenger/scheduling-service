@@ -14,6 +14,9 @@ describe('Environment Checks', () => {
 		consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 		consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+		// Re-import to reset module-level counters
+		jest.resetModules();
 	});
 
 	afterEach(() => {
@@ -26,34 +29,50 @@ describe('Environment Checks', () => {
 		consoleWarnSpy.mockRestore();
 	});
 
-	describe('All required variables present', () => {
-		beforeEach(() => {
-			// Set all required environment variables
-			process.env.NODE_ENV = 'production';
-			process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
-		});
+	function setAllRequiredVars(): void {
+		process.env.NODE_ENV = 'production';
+		process.env.DB_HOST = 'localhost';
+		process.env.DB_PORT = '5432';
+		process.env.DB_USERNAME = 'user';
+		process.env.DB_PASSWORD = 'pass';
+		process.env.DB_NAME = 'db';
+		process.env.REDIS_HOST = 'localhost';
+		process.env.REDIS_PORT = '6379';
+		process.env.HTTP_PORT = '3000';
+		process.env.GRPC_PORT = '50051';
+		process.env.MESSAGING_SERVICE_HOST = 'localhost';
+		process.env.MESSAGING_SERVICE_PORT = '50052';
+		process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
+		process.env.NOTIFICATION_SERVICE_PORT = '50053';
+	}
 
-		it('should pass when all required variables are set', () => {
-			expect(() => runEnvChecks()).not.toThrow();
+	async function freshRunEnvChecks(): Promise<typeof runEnvChecks> {
+		const mod = await import('./check-env');
+		return mod.default;
+	}
+
+	describe('All required variables present', () => {
+		it('should pass when all required variables are set', async () => {
+			setAllRequiredVars();
+			const run = await freshRunEnvChecks();
+
+			expect(() => run()).not.toThrow();
 
 			expect(consoleLogSpy).toHaveBeenCalledWith(
 				expect.stringContaining('All required environment variables are set')
 			);
 		});
 
-		it('should check all required variables', () => {
-			runEnvChecks();
+		it('should check all required variables', async () => {
+			setAllRequiredVars();
+			const run = await freshRunEnvChecks();
+
+			run();
 
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('NODE_ENV is set'));
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DATABASE_URL is set'));
+			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DB_HOST is set'));
+			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DB_PORT is set'));
+			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DB_USERNAME is set'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('REDIS_HOST is set'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('REDIS_PORT is set'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP_PORT is set'));
@@ -62,47 +81,34 @@ describe('Environment Checks', () => {
 	});
 
 	describe('Missing required variables', () => {
-		it('should throw when NODE_ENV is missing', () => {
-			process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
-			// NODE_ENV not set
+		it('should throw when NODE_ENV is missing', async () => {
+			setAllRequiredVars();
+			delete process.env.NODE_ENV;
+			const run = await freshRunEnvChecks();
 
-			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
+			expect(() => run()).toThrow('Missing required environment variables');
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
 				expect.stringContaining('NODE_ENV is NOT set (REQUIRED)')
 			);
 		});
 
-		it('should throw when DATABASE_URL is missing', () => {
-			process.env.NODE_ENV = 'production';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
-			// DATABASE_URL not set
+		it('should throw when DB_HOST is missing', async () => {
+			setAllRequiredVars();
+			delete process.env.DB_HOST;
+			const run = await freshRunEnvChecks();
 
-			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
+			expect(() => run()).toThrow('Missing required environment variables');
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				expect.stringContaining('DATABASE_URL is NOT set (REQUIRED)')
+				expect.stringContaining('DB_HOST is NOT set (REQUIRED)')
 			);
 		});
 
-		it('should throw when multiple variables are missing', () => {
+		it('should throw when multiple variables are missing', async () => {
 			process.env.NODE_ENV = 'production';
 			// All other required variables missing
+			const run = await freshRunEnvChecks();
 
-			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
+			expect(() => run()).toThrow('Missing required environment variables');
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
 				expect.stringContaining('required environment variable(s) missing')
 			);
@@ -110,68 +116,47 @@ describe('Environment Checks', () => {
 	});
 
 	describe('Empty string values', () => {
-		it('should treat empty strings as missing', () => {
+		it('should treat empty strings as missing', async () => {
+			setAllRequiredVars();
 			process.env.NODE_ENV = '';
-			process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
+			const run = await freshRunEnvChecks();
 
-			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
+			expect(() => run()).toThrow('Missing required environment variables');
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
 				expect.stringContaining('NODE_ENV is NOT set (REQUIRED)')
 			);
 		});
 
-		it('should treat whitespace-only strings as missing', () => {
+		it('should treat whitespace-only strings as missing', async () => {
+			setAllRequiredVars();
 			process.env.NODE_ENV = '   ';
-			process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
+			const run = await freshRunEnvChecks();
 
-			expect(() => runEnvChecks()).toThrow('Missing required environment variables');
+			expect(() => run()).toThrow('Missing required environment variables');
 		});
 	});
 
 	describe('Optional variables', () => {
-		beforeEach(() => {
-			// Set all required variables
-			process.env.NODE_ENV = 'production';
-			process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
-			process.env.REDIS_HOST = 'localhost';
-			process.env.REDIS_PORT = '6379';
-			process.env.HTTP_PORT = '3000';
-			process.env.GRPC_PORT = '50051';
-			process.env.MESSAGING_SERVICE_HOST = 'localhost';
-			process.env.MESSAGING_SERVICE_PORT = '50052';
-			process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-			process.env.NOTIFICATION_SERVICE_PORT = '50053';
-		});
+		it('should warn when optional variables are missing', async () => {
+			setAllRequiredVars();
+			const run = await freshRunEnvChecks();
 
-		it('should warn when optional variables are missing', () => {
-			runEnvChecks();
+			run();
 
 			expect(consoleWarnSpy).toHaveBeenCalledWith(
 				expect.stringContaining('optional environment variable(s) not set')
 			);
 		});
 
-		it('should not throw when optional variables are missing', () => {
-			expect(() => runEnvChecks()).not.toThrow();
+		it('should not throw when optional variables are missing', async () => {
+			setAllRequiredVars();
+			const run = await freshRunEnvChecks();
+
+			expect(() => run()).not.toThrow();
 		});
 
-		it('should not warn when optional variables are set', () => {
+		it('should not warn when optional variables are set', async () => {
+			setAllRequiredVars();
 			process.env.REDIS_PASSWORD = 'secret';
 			process.env.LOG_LEVEL = 'debug';
 			process.env.METRICS_ENABLED = 'true';
@@ -180,8 +165,9 @@ describe('Environment Checks', () => {
 			process.env.REDIS_DB = '1';
 			process.env.NODE_OPTIONS = '--max-old-space-size=4096';
 			process.env.HEALTH_CHECK_TIMEOUT = '10000';
+			const run = await freshRunEnvChecks();
 
-			runEnvChecks();
+			run();
 
 			expect(consoleWarnSpy).not.toHaveBeenCalledWith(
 				expect.stringContaining('optional environment variable(s) not set')
