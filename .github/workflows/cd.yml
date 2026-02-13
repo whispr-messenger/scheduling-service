@@ -190,7 +190,28 @@ jobs:
           git add argocd/k8s/whispr/scheduling-service/deployment.yaml
           git commit -m "${COMMIT_MSG}"
 
-          # Push directly to main in infrastructure repo
-          # Use rebase to handle potential concurrent updates
-          git pull origin main --rebase
-          git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git main
+          # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
+          MAX_RETRIES=3
+          for attempt in $(seq 1 "$MAX_RETRIES"); do
+            echo "Attempt ${attempt}/${MAX_RETRIES}: pulling with rebase and pushing changes..."
+
+            if ! git pull origin main --rebase; then
+              echo "⚠️ Rebase failed, resetting and retrying..."
+              git rebase --abort 2>/dev/null || true
+              git reset --soft HEAD~1
+              git commit -m "${COMMIT_MSG}"
+              sleep $((attempt * 2))
+              continue
+            fi
+
+            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git main; then
+              echo "✅ Push successful on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "⚠️ Push failed on attempt ${attempt}, retrying..."
+            sleep $((attempt * 2))
+          done
+
+          echo "❌ Failed to push after ${MAX_RETRIES} attempts"
+          exit 1
