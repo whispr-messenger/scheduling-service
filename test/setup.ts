@@ -17,7 +17,7 @@ afterAll(async () => {
 });
 
 // Mock external dependencies
-jest.mock('@nestjs/bull', () => ({
+jest.mock('@nestjs/bullmq', () => ({
 	BullModule: {
 		forRoot: jest.fn().mockReturnValue({
 			module: class MockBullModule {},
@@ -27,11 +27,9 @@ jest.mock('@nestjs/bull', () => ({
 		}),
 	},
 	getQueueToken: jest.fn((name: string) => `BullQueue_${name}`),
-	Process: jest.fn(),
-	Processor: jest.fn(),
-	OnQueueActive: jest.fn(),
-	OnQueueCompleted: jest.fn(),
-	OnQueueFailed: jest.fn(),
+	InjectQueue: jest.fn(() => jest.fn()),
+	Processor: jest.fn(() => jest.fn()),
+	WorkerHost: class MockWorkerHost {},
 }));
 
 // Mock Redis
