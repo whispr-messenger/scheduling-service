@@ -1,7 +1,7 @@
 ###################################################################################################
 # DOCKER COMPOSE FILE FOR WHISPR AUTH SERVICE DEVELOPMENT ENVIRONMENT                             #
 ###################################################################################################
-# - This file sets up the development environment with PostgreSQL, Redis, and the Auth service.   #
+# - This file sets up the development environment with PostgreSQL, Redis, and the Scheduling service.   #
 # - This configuration depends on a .env file in the same directory for environment variables     #
 #   Ensure to create a .env file with the necessary variables before running this setup.          #
 ###################################################################################################
@@ -76,7 +76,7 @@ services:
         condition: service_healthy
         restart: true
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${HTTP_PORT}/auth/v1/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:${HTTP_PORT}/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

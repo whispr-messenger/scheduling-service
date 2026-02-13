@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy package files (including lockfile) and install full deps for build
 COPY package*.json ./
 COPY package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 
 # Copy tsconfig and source, then build
 COPY tsconfig*.json ./
@@ -13,7 +13,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Remove devDependencies to keep only production deps
-RUN npm prune --production
+RUN npm prune --production --legacy-peer-deps
 
 FROM gcr.io/distroless/nodejs22-debian12 AS production
 

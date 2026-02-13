@@ -8,21 +8,7 @@ import { RetryUtil } from './utils/retry.util';
 
 @Global()
 @Module({
-  providers: [
-    LoggingInterceptor,
-    HttpExceptionFilter,
-    ValidationPipe,
-    TimezoneUtil,
-    CronUtil,
-    RetryUtil,
-  ],
-  exports: [
-    LoggingInterceptor,
-    HttpExceptionFilter,
-    ValidationPipe,
-    TimezoneUtil,
-    CronUtil,
-    RetryUtil,
-  ],
+	providers: [LoggingInterceptor, HttpExceptionFilter, ValidationPipe, TimezoneUtil, CronUtil, RetryUtil],
+	exports: [LoggingInterceptor, HttpExceptionFilter, ValidationPipe, TimezoneUtil, CronUtil, RetryUtil],
 })
 export class CommonModule {}
