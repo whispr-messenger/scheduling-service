@@ -18,7 +18,7 @@ import { CronUtil } from '@/common/utils/cron.util';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { RetryUtil } from '@/common/utils/retry.util';
 import { QueueService } from '@/modules/queues/services/queue.service';
-import { MessagingGrpcClient, NotificationType, MessageType } from '@/modules/grpc/clients/messaging.client';
+import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -159,6 +159,16 @@ export class SchedulerService {
 			correlationId,
 		});
 
+		// Validate job exists before creating execution record
+		const job = await this.jobRepository.findOne({
+			where: { id: jobId },
+			relations: ['category'],
+		});
+
+		if (!job) {
+			throw new NotFoundException(`Job with ID ${jobId} not found`);
+		}
+
 		// Create execution record
 		const execution = this.executionRepository.create({
 			id: executionId,
@@ -172,16 +182,6 @@ export class SchedulerService {
 		const savedExecution = await this.executionRepository.save(execution);
 
 		try {
-			// Get job details
-			const job = await this.jobRepository.findOne({
-				where: { id: jobId },
-				relations: ['category'],
-			});
-
-			if (!job) {
-				throw new NotFoundException(`Job with ID ${jobId} not found`);
-			}
-
 			// Execute job with timeout
 			const result = await this.executeWithTimeout(job, job.timeoutSeconds * 1000);
 
@@ -399,20 +399,10 @@ export class SchedulerService {
 				return await this.messagingClient.sendScheduledMessage({
 					conversationId: payload.conversationId,
 					senderId: payload.senderId,
-					messageType: payload.messageType || MessageType.TEXT,
+					messageType: payload.messageType || 'TEXT',
 					content: payload.content,
 					metadata: payload.metadata,
-					scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : undefined,
-				});
-
-			case 'sendNotification':
-				return await this.messagingClient.sendNotification({
-					userId: payload.userId,
-					message: payload.message,
-					conversationId: payload.conversationId,
-					type: payload.type || NotificationType.MESSAGE,
-					metadata: payload.metadata,
-					scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : undefined,
+					scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : new Date(),
 				});
 
 			case 'cleanupExpiredMessages':
@@ -427,23 +417,6 @@ export class SchedulerService {
 	}
 
 	private async executeNotificationJob(job: Job): Promise<any> {
-		const payload = job.payload as any;
-
-		// For notification jobs that need to send via messaging
-		if (job.targetMethod === 'sendReminder' || job.targetMethod === 'sendAlert') {
-			return await this.messagingClient.sendNotification({
-				userId: payload.userId,
-				message: payload.message,
-				conversationId: payload.conversationId || '',
-				type:
-					job.targetMethod === 'sendReminder'
-						? NotificationType.REMINDER
-						: NotificationType.SYSTEM_ALERT,
-				metadata: payload.metadata,
-			});
-		}
-
-		// For other notification methods, return placeholder
 		this.logger.warn('Notification job executed with placeholder', {
 			targetMethod: job.targetMethod,
 		});
