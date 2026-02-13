@@ -123,6 +123,7 @@ jobs:
           path: infrastructure
           ref: main
           token: ${{ steps.generate_token.outputs.token }}
+          fetch-depth: 0
 
       - name: Validate deployment manifest path
         run: |
