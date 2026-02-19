@@ -9,6 +9,7 @@ RUN npm ci --legacy-peer-deps --no-audit --no-fund
 
 # Copy tsconfig and source, then build
 COPY tsconfig*.json ./
+COPY nest-cli.json ./
 COPY src/ ./src/
 RUN npm run build
 
