@@ -8,10 +8,17 @@ export class LoggingInterceptor implements NestInterceptor {
 	private readonly logger = new Logger(LoggingInterceptor.name);
 
 	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		const contextType = context.getType<'http' | 'rpc' | 'ws'>();
+
+		if (contextType !== 'http') {
+			return next.handle();
+		}
+
 		const request = context.switchToHttp().getRequest<Request>();
 		const response = context.switchToHttp().getResponse<Response>();
-		const { method, url, ip } = request;
-		const userAgent = request.get('User-Agent') || '';
+		const { method, ip } = request;
+		const url = request.url.replace(/[\r\n]/g, '').slice(0, 200);
+		const userAgent = (request.get('User-Agent') || '').replace(/[\r\n]/g, '').slice(0, 200);
 		const startTime = Date.now();
 
 		this.logger.log(`Incoming Request: ${method} ${url} - IP: ${ip} - User-Agent: ${userAgent}`);
