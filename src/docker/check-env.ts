@@ -32,6 +32,22 @@ function checkOptional(varName: string, defaultValue = ''): boolean {
 	return true;
 }
 
+function checkRequiredOneOf(varNames: string[]): boolean {
+	const hasAny = varNames.some((name) => {
+		const value = process.env[name];
+		return Boolean(value && value.trim() !== '');
+	});
+
+	if (!hasAny) {
+		console.error(`${colors.red}✗${colors.reset} One of [${varNames.join(', ')}] must be set (REQUIRED)`);
+		missingVars++;
+		return false;
+	}
+
+	console.log(`${colors.green}✓${colors.reset} One of [${varNames.join(', ')}] is set`);
+	return true;
+}
+
 export default function runEnvChecks(): void {
 	console.log('==================================================');
 	console.log('  Whispr Scheduling Service - Environment Check');
@@ -54,14 +70,16 @@ export default function runEnvChecks(): void {
 	checkRequired('REDIS_PORT');
 
 	// Ports
-	checkRequired('HTTP_PORT');
+	// main.ts reads PORT, while docker/health scripts may read HTTP_PORT.
+	// Accept either for startup validation to avoid false negatives.
+	checkRequiredOneOf(['PORT', 'HTTP_PORT']);
 	checkRequired('GRPC_PORT');
 
-	// gRPC Services
-	checkRequired('MESSAGING_SERVICE_HOST');
-	checkRequired('MESSAGING_SERVICE_PORT');
-	checkRequired('NOTIFICATION_SERVICE_HOST');
-	checkRequired('NOTIFICATION_SERVICE_PORT');
+	// External service endpoints (optional in Phase 1 when dispatching via BullMQ)
+	checkOptional('MESSAGING_SERVICE_HOST', '(not required for BullMQ dispatch)');
+	checkOptional('MESSAGING_SERVICE_PORT', '(not required for BullMQ dispatch)');
+	checkOptional('NOTIFICATION_SERVICE_HOST', '(reserved for future notification integration)');
+	checkOptional('NOTIFICATION_SERVICE_PORT', '(reserved for future notification integration)');
 
 	console.log('\nChecking OPTIONAL environment variables...');
 

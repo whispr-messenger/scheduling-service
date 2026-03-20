@@ -75,8 +75,19 @@ describe('Environment Checks', () => {
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DB_USERNAME is set'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('REDIS_HOST is set'));
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('REDIS_PORT is set'));
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP_PORT is set'));
+			expect(consoleLogSpy).toHaveBeenCalledWith(
+				expect.stringContaining('One of [PORT, HTTP_PORT] is set')
+			);
 			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('GRPC_PORT is set'));
+		});
+
+		it('should pass when only PORT is set and HTTP_PORT is missing', async () => {
+			setAllRequiredVars();
+			delete process.env.HTTP_PORT;
+			process.env.PORT = '3000';
+			const run = await freshRunEnvChecks();
+
+			expect(() => run()).not.toThrow();
 		});
 	});
 

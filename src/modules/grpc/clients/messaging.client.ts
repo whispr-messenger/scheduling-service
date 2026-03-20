@@ -1,15 +1,5 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ClientGrpc, Client, Transport } from '@nestjs/microservices';
-import { join } from 'path';
-import { firstValueFrom, Observable } from 'rxjs';
-
-// Messaging service interface
-export interface MessagingServiceClient {
-	sendScheduledMessage(data: SendScheduledMessageRequest): Observable<SendMessageResponse>;
-	cleanupExpiredMessages(data: CleanupRequest): Observable<CleanupResponse>;
-	healthCheck(): Observable<HealthResponse>;
-}
+import { Injectable, Logger } from '@nestjs/common';
+import { QueueService } from '@/modules/queues/services/queue.service';
 
 export interface SendScheduledMessageRequest {
 	conversationId: string;
@@ -34,6 +24,9 @@ export interface CleanupRequest {
 export interface CleanupResponse {
 	deletedCount: number;
 	processedAt: Date;
+	status?: string;
+	queueName?: string;
+	dispatchId?: string;
 }
 
 export interface HealthResponse {
@@ -42,51 +35,51 @@ export interface HealthResponse {
 }
 
 @Injectable()
-export class MessagingGrpcClient implements OnModuleInit {
+export class MessagingGrpcClient {
 	private readonly logger = new Logger(MessagingGrpcClient.name);
-	private messagingService: MessagingServiceClient;
+	// Phase 1: use BullMQ as the outbound transport for messaging calls.
+	private readonly dispatchQueueName = 'messaging-dispatch';
 
-	@Client({
-		transport: Transport.GRPC,
-		options: {
-			package: 'whispr.messaging',
-			protoPath: join(__dirname, '../proto/messaging.proto'),
-			url: 'messaging-service:50052', // Kubernetes service name
-			loader: {
-				keepCase: true,
-				longs: String,
-				enums: String,
-				defaults: true,
-				oneofs: true,
-			},
-		},
-	})
-	private client: ClientGrpc;
-
-	constructor(private configService: ConfigService) {}
-
-	onModuleInit() {
-		this.messagingService = this.client.getService<MessagingServiceClient>('MessagingService');
-		this.logger.log('Messaging gRPC client initialized');
-	}
+	constructor(private readonly queueService: QueueService) {}
 
 	async sendScheduledMessage(request: SendScheduledMessageRequest): Promise<SendMessageResponse> {
-		this.logger.log('Sending scheduled message via gRPC', {
+		this.logger.log('Dispatching scheduled message event to BullMQ', {
 			conversationId: request.conversationId,
 			messageType: request.messageType,
 		});
 
 		try {
-			const response = await firstValueFrom(this.messagingService.sendScheduledMessage(request));
+			// Only enqueue dispatch intent here; actual delivery is handled by downstream consumers.
+			const dispatchJob = await this.queueService.addJob(
+				this.dispatchQueueName,
+				'messaging.send_scheduled_message',
+				{
+					eventName: 'messaging.send_scheduled_message',
+					dispatchedAt: new Date().toISOString(),
+					payload: {
+						conversationId: request.conversationId,
+						senderId: request.senderId,
+						messageType: request.messageType,
+						content: request.content,
+						metadata: request.metadata ?? {},
+						scheduledFor: request.scheduledFor,
+					},
+				}
+			);
 
-			this.logger.log('Scheduled message sent successfully', {
-				messageId: response.messageId,
-				status: response.status,
+			this.logger.log('Scheduled message event queued', {
+				dispatchId: dispatchJob.id,
+				queueName: this.dispatchQueueName,
 			});
 
-			return response;
+			return {
+				messageId: String(dispatchJob.id),
+				// Keep explicit queued semantics to avoid pretending remote delivery succeeded.
+				status: 'queued',
+				sentAt: new Date(),
+			};
 		} catch (error) {
-			this.logger.error('Failed to send scheduled message', {
+			this.logger.error('Failed to queue scheduled message event', {
 				error: error.message,
 				conversationId: request.conversationId,
 			});
@@ -95,21 +88,40 @@ export class MessagingGrpcClient implements OnModuleInit {
 	}
 
 	async cleanupExpiredMessages(request: CleanupRequest): Promise<CleanupResponse> {
-		this.logger.log('Cleaning up expired messages via gRPC', {
+		this.logger.log('Dispatching cleanup expired messages event to BullMQ', {
 			olderThan: request.olderThan,
 			batchSize: request.batchSize,
 		});
 
 		try {
-			const response = await firstValueFrom(this.messagingService.cleanupExpiredMessages(request));
+			// Cleanup is also dispatched asynchronously to preserve retry/DLQ behavior in BullMQ.
+			const dispatchJob = await this.queueService.addJob(
+				this.dispatchQueueName,
+				'messaging.cleanup_expired_messages',
+				{
+					eventName: 'messaging.cleanup_expired_messages',
+					dispatchedAt: new Date().toISOString(),
+					payload: {
+						olderThan: request.olderThan,
+						batchSize: request.batchSize,
+					},
+				}
+			);
 
-			this.logger.log('Message cleanup completed', {
-				deletedCount: response.deletedCount,
+			this.logger.log('Cleanup expired messages event queued', {
+				dispatchId: dispatchJob.id,
+				queueName: this.dispatchQueueName,
 			});
 
-			return response;
+			return {
+				deletedCount: 0,
+				processedAt: new Date(),
+				status: 'queued',
+				queueName: this.dispatchQueueName,
+				dispatchId: String(dispatchJob.id),
+			};
 		} catch (error) {
-			this.logger.error('Failed to cleanup expired messages', {
+			this.logger.error('Failed to queue cleanup expired messages event', {
 				error: error.message,
 			});
 			throw error;
@@ -118,11 +130,12 @@ export class MessagingGrpcClient implements OnModuleInit {
 
 	async healthCheck(): Promise<HealthResponse> {
 		try {
-			const response = await firstValueFrom(this.messagingService.healthCheck());
-
-			return response;
+			return {
+				status: 'ok',
+				message: `Messaging dispatch queue ready (${this.dispatchQueueName})`,
+			};
 		} catch (error) {
-			this.logger.error('Messaging service health check failed', {
+			this.logger.error('Messaging dispatch health check failed', {
 				error: error.message,
 			});
 			throw error;

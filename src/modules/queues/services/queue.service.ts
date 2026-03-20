@@ -11,6 +11,8 @@ export class QueueService {
 		@InjectQueue('high-priority') private highPriorityQueue: Queue,
 		@InjectQueue('medium-priority') private mediumPriorityQueue: Queue,
 		@InjectQueue('low-priority') private lowPriorityQueue: Queue,
+		// Used by Phase 1 outbound messaging event dispatch.
+		@InjectQueue('messaging-dispatch') private messagingDispatchQueue: Queue,
 		private configService: ConfigService
 	) {}
 
@@ -84,7 +86,12 @@ export class QueueService {
 	}
 
 	async removeJob(jobId: string): Promise<void> {
-		const queues = [this.highPriorityQueue, this.mediumPriorityQueue, this.lowPriorityQueue];
+		const queues = [
+			this.highPriorityQueue,
+			this.mediumPriorityQueue,
+			this.lowPriorityQueue,
+			this.messagingDispatchQueue,
+		];
 
 		for (const queue of queues) {
 			try {
@@ -183,7 +190,7 @@ export class QueueService {
 	}
 
 	async getAllQueueStats(): Promise<any[]> {
-		const queueNames = ['high-priority', 'medium-priority', 'low-priority'];
+		const queueNames = ['high-priority', 'medium-priority', 'low-priority', 'messaging-dispatch'];
 		const stats = await Promise.all(queueNames.map((name) => this.getQueueStats(name)));
 
 		return stats;
@@ -246,6 +253,8 @@ export class QueueService {
 				return this.mediumPriorityQueue;
 			case 'low-priority':
 				return this.lowPriorityQueue;
+			case 'messaging-dispatch':
+				return this.messagingDispatchQueue;
 			default:
 				throw new Error(`Unknown queue: ${queueName}`);
 		}

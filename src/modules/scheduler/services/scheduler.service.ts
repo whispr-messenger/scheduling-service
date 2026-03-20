@@ -185,18 +185,27 @@ export class SchedulerService {
 			// Execute job with timeout
 			const result = await this.executeWithTimeout(job, job.timeoutSeconds * 1000);
 
-			// Update execution with success
+			// Phase 1.5: for messaging jobs we only dispatch to queue.
+			// Do not mark execution as COMPLETED when downstream processing has not happened yet.
+			const isDispatchOnly =
+				job.targetService === 'messaging' &&
+				typeof result === 'object' &&
+				result?.dispatchStatus === 'queued';
+
+			// Update execution status
 			const duration = Date.now() - startTime;
-			savedExecution.status = ExecutionStatus.COMPLETED;
-			savedExecution.completedAt = new Date();
+			savedExecution.status = isDispatchOnly ? ExecutionStatus.PENDING : ExecutionStatus.COMPLETED;
+			savedExecution.completedAt = isDispatchOnly ? null : new Date();
 			savedExecution.resultData = result;
 			savedExecution.durationMs = duration;
 
 			const updatedExecution = await this.executionRepository.save(savedExecution);
 
-			this.logger.log('Job execution completed successfully', {
+			this.logger.log('Job execution persisted successfully', {
 				executionId,
 				jobId,
+				status: savedExecution.status,
+				dispatchOnly: isDispatchOnly,
 				duration,
 			});
 
@@ -395,8 +404,9 @@ export class SchedulerService {
 		const payload = job.payload as any;
 
 		switch (job.targetMethod) {
-			case 'sendScheduledMessage':
-				return await this.messagingClient.sendScheduledMessage({
+			case 'sendScheduledMessage': {
+				// Phase 1 semantics: execution succeeds when dispatch is accepted by queue, not when message is delivered.
+				const dispatch = await this.messagingClient.sendScheduledMessage({
 					conversationId: payload.conversationId,
 					senderId: payload.senderId,
 					messageType: payload.messageType || 'TEXT',
@@ -404,12 +414,31 @@ export class SchedulerService {
 					metadata: payload.metadata,
 					scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : new Date(),
 				});
+				return {
+					targetService: 'messaging',
+					targetMethod: job.targetMethod,
+					dispatchStatus: 'queued',
+					dispatchId: dispatch.messageId,
+					transport: 'bullmq',
+					queuedAt: dispatch.sentAt,
+				};
+			}
 
-			case 'cleanupExpiredMessages':
-				return await this.messagingClient.cleanupExpiredMessages({
+			case 'cleanupExpiredMessages': {
+				// Keep targetMethod compatibility while switching transport from gRPC to queue dispatch.
+				const dispatch = await this.messagingClient.cleanupExpiredMessages({
 					olderThan: new Date(payload.olderThan),
 					batchSize: payload.batchSize,
 				});
+				return {
+					targetService: 'messaging',
+					targetMethod: job.targetMethod,
+					dispatchStatus: dispatch.status || 'queued',
+					dispatchId: dispatch.dispatchId,
+					transport: 'bullmq',
+					queuedAt: dispatch.processedAt,
+				};
+			}
 
 			default:
 				throw new Error(`Unknown messaging method: ${job.targetMethod}`);

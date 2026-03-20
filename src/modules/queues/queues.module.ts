@@ -47,6 +47,19 @@ import { SchedulerModule } from '../scheduler/scheduler.module';
 						delay: 5000,
 					},
 				},
+			},
+			{
+				// Dedicated queue for outbound messaging dispatch events from scheduling-service.
+				name: 'messaging-dispatch',
+				defaultJobOptions: {
+					removeOnComplete: 200,
+					removeOnFail: 500,
+					attempts: 5,
+					backoff: {
+						type: 'exponential',
+						delay: 2000,
+					},
+				},
 			}
 		),
 	],
