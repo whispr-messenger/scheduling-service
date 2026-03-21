@@ -1,12 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/modules/app/app.module';
 import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
-const mockAuthGuard = {
-	canActivate: () => true,
-};
+class MockAuthGuard implements CanActivate {
+	canActivate(context: ExecutionContext): boolean {
+		const req = context.switchToHttp().getRequest();
+		req.user = { userId: 'test-user', jti: 'test-jti', deviceId: 'test-device' };
+		return true;
+	}
+}
 
 describe('SchedulingService (e2e)', () => {
 	let app: INestApplication;
@@ -16,7 +21,9 @@ describe('SchedulingService (e2e)', () => {
 			imports: [AppModule],
 		})
 			.overrideGuard(JwtAuthGuard)
-			.useValue(mockAuthGuard)
+			.useClass(MockAuthGuard)
+			.overrideGuard(ThrottlerGuard)
+			.useValue({ canActivate: () => true })
 			.compile();
 
 		app = moduleFixture.createNestApplication();
