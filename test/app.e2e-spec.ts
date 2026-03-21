@@ -4,6 +4,10 @@ import * as request from 'supertest';
 import { AppModule } from '../src/modules/app/app.module';
 import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
 
+const mockAuthGuard = {
+	canActivate: () => true,
+};
+
 describe('SchedulingService (e2e)', () => {
 	let app: INestApplication;
 
@@ -11,11 +15,8 @@ describe('SchedulingService (e2e)', () => {
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [AppModule],
 		})
-			// Bypass JWT auth so e2e tests can reach business logic without a real JWKS server.
-			// JwtAuthGuard is registered as APP_GUARD via `useExisting: JwtAuthGuard`, so
-			// overriding the JwtAuthGuard provider directly replaces the guard for all routes.
-			.overrideProvider(JwtAuthGuard)
-			.useValue({ canActivate: () => true })
+			.overrideGuard(JwtAuthGuard)
+			.useValue(mockAuthGuard)
 			.compile();
 
 		app = moduleFixture.createNestApplication();
