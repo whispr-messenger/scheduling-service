@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwksService } from './jwks.service';
 
@@ -13,12 +13,13 @@ const ES256_JWK = {
 
 describe('JwksService', () => {
 	let service: JwksService;
+
 	const mockConfigService = {
 		getOrThrow: jest.fn().mockReturnValue('https://auth-service/.well-known/jwks.json'),
 	};
 
 	beforeEach(async () => {
-		const module = await Test.createTestingModule({
+		const module: TestingModule = await Test.createTestingModule({
 			providers: [JwksService, { provide: ConfigService, useValue: mockConfigService }],
 		}).compile();
 

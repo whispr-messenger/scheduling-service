@@ -1,8 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwksService } from '../jwks/jwks.service';
 
@@ -39,7 +39,7 @@ function buildTokenWithKid(kid?: string): string {
 	return `${headerB64}.payload.sig`;
 }
 
-function buildContext(authHeader?: string, handler = {}, cls = {}) {
+function buildContext(authHeader?: string, handler = {}, cls = {}): ExecutionContext {
 	const request: { headers: Record<string, string>; user?: unknown } = {
 		headers: authHeader ? { authorization: authHeader } : {},
 	};
@@ -49,7 +49,7 @@ function buildContext(authHeader?: string, handler = {}, cls = {}) {
 		}),
 		getHandler: () => handler,
 		getClass: () => cls,
-	};
+	} as unknown as ExecutionContext;
 }
 
 describe('JwtAuthGuard', () => {
@@ -62,7 +62,7 @@ describe('JwtAuthGuard', () => {
 		mockCacheManager.get.mockResolvedValue(null);
 		mockReflector.getAllAndOverride.mockReturnValue(false);
 
-		const module = await Test.createTestingModule({
+		const module: TestingModule = await Test.createTestingModule({
 			providers: [
 				JwtAuthGuard,
 				{ provide: JwksService, useValue: mockJwksService },
@@ -77,28 +77,29 @@ describe('JwtAuthGuard', () => {
 
 	it('should allow a request with a valid token and no revocation', async () => {
 		const ctx = buildContext('Bearer valid-token');
-		const result = await guard.canActivate(ctx as never);
+		const result = await guard.canActivate(ctx);
 		expect(result).toBe(true);
 	});
 
 	it('should skip auth and return true for @Public() routes', async () => {
 		mockReflector.getAllAndOverride.mockReturnValue(true);
 		const ctx = buildContext(undefined);
-		const result = await guard.canActivate(ctx as never);
+		const result = await guard.canActivate(ctx);
 		expect(result).toBe(true);
 	});
 
 	it('should inject user context into the request', async () => {
-		const request = { headers: { authorization: 'Bearer valid-token' } } as {
-			headers: Record<string, string>;
-			user?: unknown;
+		const request: { headers: Record<string, string>; user?: unknown } = {
+			headers: { authorization: 'Bearer valid-token' },
 		};
 		const ctx = {
 			switchToHttp: () => ({ getRequest: () => request }),
 			getHandler: () => ({}),
 			getClass: () => ({}),
-		};
-		await guard.canActivate(ctx as never);
+		} as unknown as ExecutionContext;
+
+		await guard.canActivate(ctx);
+
 		expect(request.user).toEqual({
 			userId: VALID_PAYLOAD.sub,
 			jti: VALID_PAYLOAD.jti,
@@ -109,18 +110,18 @@ describe('JwtAuthGuard', () => {
 
 	it('should throw 401 when Authorization header is missing', async () => {
 		const ctx = buildContext(undefined);
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 when Authorization header does not start with Bearer', async () => {
 		const ctx = buildContext('Basic dXNlcjpwYXNz');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 when public key is not loaded (no kid in token)', async () => {
 		mockJwksService.getPublicKeyPem.mockReturnValue(null);
 		const ctx = buildContext('Bearer valid-token');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 and trigger scheduleReloadForUnknownKid when kid is unknown', async () => {
@@ -131,20 +132,20 @@ describe('JwtAuthGuard', () => {
 
 		const token = buildTokenWithKid('unknown-kid');
 		const ctx = buildContext(`Bearer ${token}`);
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 		expect(mockJwksService.scheduleReloadForUnknownKid).toHaveBeenCalledTimes(1);
 	});
 
 	it('should throw 401 when JWT verification fails', async () => {
 		mockJwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
 		const ctx = buildContext('Bearer bad-token');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 when payload is missing required fields', async () => {
 		mockJwtService.verifyAsync.mockResolvedValue({ sub: 'user-1' });
 		const ctx = buildContext('Bearer valid-token');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 when token jti is revoked in Redis', async () => {
@@ -153,7 +154,7 @@ describe('JwtAuthGuard', () => {
 			return Promise.resolve(null);
 		});
 		const ctx = buildContext('Bearer valid-token');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should throw 401 when device is revoked in Redis', async () => {
@@ -162,12 +163,12 @@ describe('JwtAuthGuard', () => {
 			return Promise.resolve(null);
 		});
 		const ctx = buildContext('Bearer valid-token');
-		await expect(guard.canActivate(ctx as never)).rejects.toThrow(UnauthorizedException);
+		await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
 	});
 
 	it('should check both revoked:{jti} and revoked_device:{deviceId} in Redis', async () => {
 		const ctx = buildContext('Bearer valid-token');
-		await guard.canActivate(ctx as never);
+		await guard.canActivate(ctx);
 		expect(mockCacheManager.get).toHaveBeenCalledWith(`revoked:${VALID_PAYLOAD.jti}`);
 		expect(mockCacheManager.get).toHaveBeenCalledWith(`revoked_device:${VALID_PAYLOAD.deviceId}`);
 	});
@@ -176,7 +177,7 @@ describe('JwtAuthGuard', () => {
 		const { fingerprint: _fp, ...payloadWithoutFingerprint } = VALID_PAYLOAD;
 		mockJwtService.verifyAsync.mockResolvedValue(payloadWithoutFingerprint);
 		const ctx = buildContext('Bearer valid-token');
-		const result = await guard.canActivate(ctx as never);
+		const result = await guard.canActivate(ctx);
 		expect(result).toBe(true);
 	});
 });

@@ -10,15 +10,16 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import type { Request } from 'express';
 import { JwksService } from '../jwks/jwks.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
-import { Request } from 'express';
 
 interface JwtPayload {
 	sub: string;
 	jti: string;
 	deviceId: string;
 	fingerprint?: string;
+	[key: string]: unknown;
 }
 
 @Injectable()
@@ -45,6 +46,7 @@ export class JwtAuthGuard implements CanActivate {
 
 		const request = context.switchToHttp().getRequest<Request>();
 		const token = this.extractBearerToken(request);
+
 		if (!token) {
 			throw new UnauthorizedException();
 		}
@@ -88,13 +90,14 @@ export class JwtAuthGuard implements CanActivate {
 		}
 
 		const { sub, jti, deviceId, fingerprint } = payload;
+
 		if (!sub || !jti || !deviceId) {
 			throw new UnauthorizedException();
 		}
 
 		const [tokenRevoked, deviceRevoked] = await Promise.all([
-			this.cacheManager.get(`revoked:${jti}`),
-			this.cacheManager.get(`revoked_device:${deviceId}`),
+			this.cacheManager.get<string>(`revoked:${jti}`),
+			this.cacheManager.get<string>(`revoked_device:${deviceId}`),
 		]);
 
 		if (tokenRevoked !== undefined && tokenRevoked !== null) {
