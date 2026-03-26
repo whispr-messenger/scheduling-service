@@ -108,7 +108,9 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 				const kid = ecKey.kid ?? 'default';
 				newMap.set(kid, pem);
 			} catch (importError) {
-				this.logger.warn(`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`);
+				this.logger.warn(
+					`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`
+				);
 			}
 		}
 
