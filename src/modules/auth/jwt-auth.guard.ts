@@ -117,9 +117,12 @@ export class JwtAuthGuard implements CanActivate {
 	private extractBearerToken(request: Request): string | null {
 		const authHeader = request.headers.authorization;
 		if (!authHeader) return null;
-		// Case-insensitive match for the Bearer scheme (RFC 7235 allows any case).
-		const match = authHeader.match(/^bearer\s+(.+)$/i);
-		return match ? match[1] : null;
+		// Manually check the Bearer prefix case-insensitively to avoid ReDoS.
+		// RFC 7235 allows any case for the auth scheme.
+		const prefix = authHeader.slice(0, 7).toLowerCase();
+		if (prefix !== 'bearer ') return null;
+		const token = authHeader.slice(7).trim();
+		return token.length > 0 ? token : null;
 	}
 
 	/** Reads the `kid` field from the JWT header without verifying the token. */
