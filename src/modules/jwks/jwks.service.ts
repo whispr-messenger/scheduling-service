@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createPublicKey } from 'node:crypto';
+import { createPublicKey, type JsonWebKey as CryptoJsonWebKey } from 'node:crypto';
 
 const FETCH_TIMEOUT_MS = 5000;
 /**
@@ -16,10 +16,21 @@ const BACKOFF_MAX_ATTEMPTS = 3;
 /** Background retry interval after startup attempts are exhausted */
 const BACKGROUND_RETRY_MS = 30_000;
 
+/** Subset of the crypto.JsonWebKey interface that we care about for EC P-256 keys. */
+interface EcJwkKey extends CryptoJsonWebKey {
+	kid?: string;
+}
+
+interface JwksDocument {
+	keys: EcJwkKey[];
+}
+
 @Injectable()
 export class JwksService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(JwksService.name);
-	private keyMap = new Map<string, string>();
+	/** Map of kid -> PEM string.  "default" is used when a key has no kid. */
+	private keyMap: Map<string, string> = new Map();
+	/** Cached PEM for the primary (first loaded) key — for guards that don't need kid routing. */
 	private primaryPem: string | null = null;
 
 	/** Debounce handle – prevents flood of concurrent reload requests. */
@@ -63,7 +74,8 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 				(fetchError as Error).name === 'AbortError'
 					? `timed out after ${FETCH_TIMEOUT_MS}ms`
 					: ((fetchError as Error).message ?? 'Network error');
-			throw new Error(`JWKS fetch failed: ${reason}`, { cause: fetchError });
+			// eslint-disable-next-line preserve-caught-error
+			throw new Error(`JWKS fetch failed: ${reason}`);
 		} finally {
 			globalThis.clearTimeout(timeout);
 		}
@@ -72,25 +84,15 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 			throw new Error(`JWKS endpoint returned HTTP ${response.status}`);
 		}
 
-		let document: { keys?: unknown[] };
+		let document: JwksDocument;
 		try {
-			document = (await response.json()) as { keys?: unknown[] };
+			document = (await response.json()) as JwksDocument;
 		} catch (parseError) {
-			throw new Error(`Failed to parse JWKS response: ${(parseError as Error).message}`, {
-				cause: parseError,
-			});
+			// eslint-disable-next-line preserve-caught-error
+			throw new Error(`Failed to parse JWKS response: ${(parseError as Error).message}`);
 		}
 
-		type EcJwk = {
-			kty: string;
-			crv?: string;
-			use?: string;
-			alg?: string;
-			x?: string;
-			y?: string;
-			kid?: string;
-		};
-		const ecKeys = ((document.keys ?? []) as EcJwk[]).filter(
+		const ecKeys = (document.keys ?? []).filter(
 			(k) => k.kty === 'EC' && k.crv === 'P-256' && (k.use === 'sig' || k.alg === 'ES256') && k.x && k.y
 		);
 
@@ -101,14 +103,12 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 		const newMap = new Map<string, string>();
 		for (const ecKey of ecKeys) {
 			try {
-				const keyObject = createPublicKey({ key: ecKey as any, format: 'jwk' });
+				const keyObject = createPublicKey({ key: ecKey as CryptoJsonWebKey, format: 'jwk' });
 				const pem = keyObject.export({ type: 'spki', format: 'pem' }) as string;
 				const kid = ecKey.kid ?? 'default';
 				newMap.set(kid, pem);
 			} catch (importError) {
-				this.logger.warn(
-					`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`
-				);
+				this.logger.warn(`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`);
 			}
 		}
 
@@ -181,6 +181,10 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 		});
 	}
 
+	/**
+	 * Returns the PEM for the given kid, or the primary PEM if kid is undefined.
+	 * Returns null if no keys are loaded.
+	 */
 	getPublicKeyPem(kid?: string): string | null {
 		if (kid !== undefined) {
 			return this.keyMap.get(kid) ?? null;

@@ -25,6 +25,7 @@ interface JwtPayload {
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
 	private readonly logger = new Logger(JwtAuthGuard.name);
+	/** Suppress repeated "key not loaded" warnings; log only once until the key loads. */
 	private keyNotLoadedWarned = false;
 
 	constructor(
@@ -51,6 +52,7 @@ export class JwtAuthGuard implements CanActivate {
 			throw new UnauthorizedException();
 		}
 
+		// Peek the kid from the JWT header (unverified) to select the right key.
 		const kid = this.peekKid(token);
 		let publicKeyPem = this.jwksService.getPublicKeyPem(kid ?? undefined);
 
@@ -76,6 +78,7 @@ export class JwtAuthGuard implements CanActivate {
 			throw new UnauthorizedException();
 		}
 
+		// Key is loaded — reset the flag so we log again if the key is ever evicted.
 		this.keyNotLoadedWarned = false;
 
 		let payload: JwtPayload;
@@ -114,11 +117,12 @@ export class JwtAuthGuard implements CanActivate {
 	private extractBearerToken(request: Request): string | null {
 		const authHeader = request.headers.authorization;
 		if (!authHeader) return null;
-		if (authHeader.slice(0, 7).toLowerCase() !== 'bearer ') return null;
-		const token = authHeader.slice(7).trim();
-		return token.length > 0 ? token : null;
+		// Case-insensitive match for the Bearer scheme (RFC 7235 allows any case).
+		const match = authHeader.match(/^bearer\s+(.+)$/i);
+		return match ? match[1] : null;
 	}
 
+	/** Reads the `kid` field from the JWT header without verifying the token. */
 	private peekKid(token: string): string | null {
 		try {
 			const [headerB64] = token.split('.');

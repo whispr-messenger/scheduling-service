@@ -128,6 +128,7 @@ describe('JwksService', () => {
 		});
 
 		it('should throw when the EC key is missing x/y coordinates', async () => {
+			// Keys without x/y coordinates are filtered out; if none remain, we throw.
 			const keyMissingCoords = { kty: 'EC', use: 'sig', alg: 'ES256', crv: 'P-256' };
 			jest.spyOn(globalThis, 'fetch').mockResolvedValue({
 				ok: true,
@@ -147,6 +148,7 @@ describe('JwksService', () => {
 			} as unknown as Response);
 
 			await service.loadPublicKey();
+
 			expect(service.isReady()).toBe(true);
 			expect(service.getPublicKeyPem('key-1')).not.toBeNull();
 			expect(service.getPublicKeyPem('key-2')).not.toBeNull();
