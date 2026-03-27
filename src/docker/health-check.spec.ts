@@ -160,7 +160,7 @@ describe('Health Check Script', () => {
 			};
 
 			httpRequestSpy.mockImplementation((options: any, callback: Function) => {
-				expect(options.path).toBe('/api/v1/monitoring/health/ready');
+				expect(options.path).toBe('/health/ready');
 				callback(mockResponse);
 				return mockRequest;
 			});
