@@ -102,8 +102,9 @@ export class JwtAuthGuard implements CanActivate {
 	private extractBearerToken(request: Request): string | null {
 		const authHeader = request.headers.authorization;
 		if (!authHeader) return null;
-		const match = authHeader.match(/^bearer\s+(.+)$/i);
-		return match ? match[1] : null;
+		if (authHeader.slice(0, 7).toLowerCase() !== 'bearer ') return null;
+		const token = authHeader.slice(7).trim();
+		return token.length > 0 ? token : null;
 	}
 
 	private peekKid(token: string): string | null {
