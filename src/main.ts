@@ -100,7 +100,7 @@ async function bootstrap() {
 	logger.log(`gRPC server is listening on ${grpcUrl}`);
 
 	// Start HTTP server
-	const port = configService.get('PORT', '3000');
+	const port = configService.get('HTTP_PORT', '3000');
 	await app.listen(port, '0.0.0.0');
 
 	logger.log(`🚀 Whispr Scheduling Service is running on port ${port}`);
