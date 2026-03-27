@@ -89,7 +89,10 @@ describe('JwtAuthGuard', () => {
 	});
 
 	it('should inject user context into the request', async () => {
-		const request = { headers: { authorization: 'Bearer valid-token' } } as { headers: Record<string, string>; user?: unknown };
+		const request = { headers: { authorization: 'Bearer valid-token' } } as {
+			headers: Record<string, string>;
+			user?: unknown;
+		};
 		const ctx = {
 			switchToHttp: () => ({ getRequest: () => request }),
 			getHandler: () => ({}),

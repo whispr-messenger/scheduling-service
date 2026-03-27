@@ -87,7 +87,9 @@ describe('JwksService', () => {
 		it('should throw when the fetch times out', async () => {
 			const abortError = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
 			jest.spyOn(globalThis, 'fetch').mockRejectedValue(abortError);
-			await expect(service.loadPublicKey()).rejects.toThrow('JWKS fetch failed: timed out after 5000ms');
+			await expect(service.loadPublicKey()).rejects.toThrow(
+				'JWKS fetch failed: timed out after 5000ms'
+			);
 			expect(service.isReady()).toBe(false);
 		});
 
@@ -105,7 +107,9 @@ describe('JwksService', () => {
 				ok: true,
 				json: jest.fn().mockResolvedValue({ keys: [{ kty: 'RSA' }] }),
 			} as unknown as Response);
-			await expect(service.loadPublicKey()).rejects.toThrow('No ES256 (EC P-256) key found in JWKS document');
+			await expect(service.loadPublicKey()).rejects.toThrow(
+				'No ES256 (EC P-256) key found in JWKS document'
+			);
 			expect(service.isReady()).toBe(false);
 		});
 
@@ -115,7 +119,9 @@ describe('JwksService', () => {
 				ok: true,
 				json: jest.fn().mockResolvedValue({ keys: [keyNoUseOrAlg] }),
 			} as unknown as Response);
-			await expect(service.loadPublicKey()).rejects.toThrow('No ES256 (EC P-256) key found in JWKS document');
+			await expect(service.loadPublicKey()).rejects.toThrow(
+				'No ES256 (EC P-256) key found in JWKS document'
+			);
 		});
 
 		it('should throw when the EC key is missing x/y coordinates', async () => {
@@ -124,7 +130,9 @@ describe('JwksService', () => {
 				ok: true,
 				json: jest.fn().mockResolvedValue({ keys: [keyMissingCoords] }),
 			} as unknown as Response);
-			await expect(service.loadPublicKey()).rejects.toThrow('No ES256 (EC P-256) key found in JWKS document');
+			await expect(service.loadPublicKey()).rejects.toThrow(
+				'No ES256 (EC P-256) key found in JWKS document'
+			);
 		});
 
 		it('should select a key by kid when multiple keys are present', async () => {
@@ -147,7 +155,9 @@ describe('JwksService', () => {
 				ok: true,
 				json: jest.fn().mockResolvedValue({ keys: [] }),
 			} as unknown as Response);
-			await expect(service.loadPublicKey()).rejects.toThrow('No ES256 (EC P-256) key found in JWKS document');
+			await expect(service.loadPublicKey()).rejects.toThrow(
+				'No ES256 (EC P-256) key found in JWKS document'
+			);
 		});
 
 		it('should throw when the response body is not valid JSON', async () => {
@@ -201,9 +211,7 @@ describe('JwksService', () => {
 		});
 
 		it('should trigger a reload when an unknown kid is encountered', async () => {
-			const loadSpy = jest
-				.spyOn(service, 'loadPublicKey')
-				.mockResolvedValue(undefined);
+			const loadSpy = jest.spyOn(service, 'loadPublicKey').mockResolvedValue(undefined);
 
 			service.scheduleReloadForUnknownKid();
 

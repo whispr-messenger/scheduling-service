@@ -1,4 +1,11 @@
-import { CanActivate, ExecutionContext, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+	CanActivate,
+	ExecutionContext,
+	Inject,
+	Injectable,
+	Logger,
+	UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -59,7 +66,9 @@ export class JwtAuthGuard implements CanActivate {
 
 		if (!publicKeyPem) {
 			if (!this.keyNotLoadedWarned) {
-				this.logger.warn('Public key not loaded — rejecting request (further warnings suppressed until key loads)');
+				this.logger.warn(
+					'Public key not loaded — rejecting request (further warnings suppressed until key loads)'
+				);
 				this.keyNotLoadedWarned = true;
 			}
 			throw new UnauthorizedException();

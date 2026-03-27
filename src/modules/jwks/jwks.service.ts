@@ -55,10 +55,20 @@ export class JwksService implements OnModuleInit {
 		try {
 			document = (await response.json()) as { keys?: unknown[] };
 		} catch (parseError) {
-			throw new Error(`Failed to parse JWKS response: ${(parseError as Error).message}`, { cause: parseError });
+			throw new Error(`Failed to parse JWKS response: ${(parseError as Error).message}`, {
+				cause: parseError,
+			});
 		}
 
-		type EcJwk = { kty: string; crv?: string; use?: string; alg?: string; x?: string; y?: string; kid?: string };
+		type EcJwk = {
+			kty: string;
+			crv?: string;
+			use?: string;
+			alg?: string;
+			x?: string;
+			y?: string;
+			kid?: string;
+		};
 		const ecKeys = ((document.keys ?? []) as EcJwk[]).filter(
 			(k) => k.kty === 'EC' && k.crv === 'P-256' && (k.use === 'sig' || k.alg === 'ES256') && k.x && k.y
 		);
@@ -70,13 +80,14 @@ export class JwksService implements OnModuleInit {
 		const newMap = new Map<string, string>();
 		for (const ecKey of ecKeys) {
 			try {
-				 
 				const keyObject = createPublicKey({ key: ecKey as any, format: 'jwk' });
 				const pem = keyObject.export({ type: 'spki', format: 'pem' }) as string;
 				const kid = ecKey.kid ?? 'default';
 				newMap.set(kid, pem);
 			} catch (importError) {
-				this.logger.warn(`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`);
+				this.logger.warn(
+					`Skipping unreadable EC key (kid=${ecKey.kid ?? 'none'}): ${(importError as Error).message}`
+				);
 			}
 		}
 
