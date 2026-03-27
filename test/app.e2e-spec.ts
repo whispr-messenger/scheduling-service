@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { APP_GUARD } from '@nestjs/core';
 import { AppModule } from '../src/modules/app/app.module';
 import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
 
@@ -13,11 +12,9 @@ describe('SchedulingService (e2e)', () => {
 			imports: [AppModule],
 		})
 			// Bypass JWT auth so e2e tests can reach business logic without a real JWKS server.
-			// JwtAuthGuard is registered as APP_GUARD (global), so we must override both the
-			// guard class AND the APP_GUARD token to ensure all routes are accessible in tests.
-			.overrideGuard(JwtAuthGuard)
-			.useValue({ canActivate: () => true })
-			.overrideProvider(APP_GUARD)
+			// JwtAuthGuard is registered as APP_GUARD via `useExisting: JwtAuthGuard`, so
+			// overriding the JwtAuthGuard provider directly replaces the guard for all routes.
+			.overrideProvider(JwtAuthGuard)
 			.useValue({ canActivate: () => true })
 			.compile();
 
