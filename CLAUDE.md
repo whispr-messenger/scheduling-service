@@ -1,0 +1,508 @@
+# AI Agent Workflow — whispr-messenger/scheduling-service
+
+This document describes the full development workflow an AI agent must follow
+when picking up and completing a Jira ticket for this repository.
+
+---
+
+## 0. Prerequisites
+
+- Jira cloud ID: `82ae2da5-7ee5-48f7-8877-a644651cd84b`
+- GitHub org/repo: `whispr-messenger/scheduling-service`
+- Default base branch: `main`
+- Node package manager: `npm` (husky hooks run on commit and push)
+
+---
+
+## 1. Pick the ticket
+
+1. Use `mcp__atlassian__getJiraIssue` to fetch the target ticket (e.g. `WHISPR-290`).
+2. Read the **description**, **acceptance criteria**, and **priority** carefully.
+3. Use `mcp__atlassian__getTransitionsForJiraIssue` to list available transitions.
+4. Transition the ticket from "À faire" → "En cours" using `mcp__atlassian__transitionJiraIssue`
+   with the transition id whose `name` is `"En cours"` (currently `"21"`).
+
+---
+
+## 2. Prepare the branch
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b <TICKET-KEY>-<short-kebab-description>
+```
+
+Branch naming convention: `WHISPR-XXX-short-description-of-the-fix`
+
+Example: `WHISPR-498-consolidate-health-endpoints`
+
+---
+
+## 3. Implement the fix
+
+1. **Explore first** — run `mcp__gitnexus__query` with the ticket's key concepts to find relevant execution flows before opening any file:
+   ```json
+   { "query": "<ticket concept e.g. 'quota upload media'>", "limit": 5 }
+   ```
+2. **Check impact before editing** — for every symbol you plan to modify, run `mcp__gitnexus__impact` and report the blast radius to the user before touching the code:
+   ```json
+   { "target": "<symbolName>", "direction": "upstream" }
+   ```
+   Stop and warn the user if the result is HIGH or CRITICAL risk.
+3. Read all relevant files before modifying anything.
+4. Make the smallest change that fully addresses the ticket.
+5. Do not refactor unrelated code, add comments, or change formatting outside
+   the touched lines.
+6. Prefer editing existing files over creating new ones.
+
+---
+
+## 4. Write tests
+
+Tests go in two places:
+
+| Kind | Location | Pattern |
+|------|----------|---------|
+| Unit | next to the source file | `*.spec.ts` |
+| E2E  | `test/` directory | `*.e2e-spec.ts` |
+
+### Rules
+
+- **Test behaviour, not implementation.** Assert on observable outcomes
+  (return values, HTTP status codes, cache keys written) rather than
+  internal call sequences.
+- Mock all I/O (database, cache, JWT service, S3/MinIO) — never hit real services.
+- For guard/controller e2e tests, use an existing protected route rather than adding a throwaway controller.
+- For e2e tests, override providers via `.overrideProvider(...).useValue(...)`.
+
+### Run tests
+
+```bash
+# Unit tests only
+npx jest --no-coverage
+
+# E2E tests only
+npx jest --config test/jest-e2e.json --no-coverage
+
+# Specific pattern
+npx jest --testPathPatterns="quota" --no-coverage
+```
+
+All tests must be green before committing.
+
+---
+
+## 5. Lint and format
+
+```bash
+npx eslint "src/**/*.ts" --fix
+npx prettier --write "src/**/*.ts" "test/**/*.ts"
+```
+
+The husky pre-commit hook runs eslint + prettier automatically on staged files,
+so manual runs are only needed if husky is not installed.
+
+---
+
+## 6. Commit
+
+Before staging, run a pre-commit scope check:
+
+```json
+// mcp__gitnexus__detect_changes
+{ "scope": "staged" }
+```
+
+If the diff includes unexpected symbols or execution flows, investigate before proceeding.
+
+Stage only the files you changed:
+
+```bash
+git add <file1> <file2> ...
+```
+
+Commit message format (Conventional Commits):
+
+```
+<type>(<scope>): <short imperative summary>
+
+<optional body — explain the why, not the what>
+```
+
+- **type**: `fix`, `feat`, `refactor`, `test`, `docs`, `chore`
+- **scope**: module name, e.g. `quota`, `media`, `storage`
+- Do **not** mention Claude, AI, or any tooling in the commit message.
+- Do **not** use `--no-verify` to skip hooks.
+
+Example:
+```
+fix(health): consolidate probe surface to /health
+```
+
+---
+
+## 7. Push
+
+```bash
+git push -u origin <branch-name>
+```
+
+The pre-push hook runs the full unit test suite (`npm test`). Fix any failures
+before retrying — do not force-push to bypass.
+
+After every push to an existing PR branch, **immediately**:
+
+1. Copilot Code Review is triggered automatically by CI on each push — do **not** manually request a new review unless explicitly asked by maintainers or if the automation fails. If a manual trigger is needed:
+
+```json
+// mcp__github__request_copilot_review
+{
+  "owner": "whispr-messenger",
+  "repo": "scheduling-service",
+  "pullNumber": <number>
+}
+```
+
+2. Wait for the SonarCloud analysis to complete (triggered by CI), then check the quality gate and open issues on the PR:
+
+```json
+// mcp__sonarqube__list_pull_requests — find the PR key Sonar assigned
+{ "projectKey": "whispr-messenger_scheduling-service" }
+
+// mcp__sonarqube__get_project_quality_gate_status — must be OK to proceed
+{
+  "projectKey": "whispr-messenger_scheduling-service",
+  "pullRequest": "<sonar-pr-key>"
+}
+
+// mcp__sonarqube__search_sonar_issues_in_projects — fix BLOCKER/HIGH issues
+{
+  "projects": ["whispr-messenger_scheduling-service"],
+  "pullRequestId": "<sonar-pr-key>",
+  "issueStatuses": ["OPEN"],
+  "severities": ["BLOCKER", "HIGH"]
+}
+```
+
+**Do not proceed to merge until the quality gate is `OK` and no BLOCKER/HIGH issues remain.**
+
+This applies both to the initial push and to any subsequent push that addresses review comments.
+
+---
+
+## 8. Open a Pull Request
+
+Use `mcp__github__create_pull_request`:
+
+```json
+{
+  "owner": "whispr-messenger",
+  "repo": "scheduling-service",
+  "title": "<same as commit title>",
+  "head": "<branch-name>",
+  "base": "main",
+  "body": "## Summary\n- bullet 1\n- bullet 2\n\n## Test plan\n- [ ] Unit tests green\n- [ ] E2E tests green\n- [ ] Lint clean\n\nCloses <TICKET-KEY>"
+}
+```
+
+After creation, request a Copilot review immediately using `mcp__github__request_copilot_review`:
+
+```json
+{
+  "owner": "whispr-messenger",
+  "repo": "scheduling-service",
+  "pullNumber": <number>
+}
+```
+
+Then check CI with:
+
+```bash
+gh pr checks <PR-number> --repo whispr-messenger/scheduling-service
+```
+
+Fix any failing checks before moving to §8b.
+
+---
+
+## 8b. Process review comments
+
+GitHub Copilot reviews the PR automatically on each push. Repeat the loop below
+until no unresolved, non-outdated threads remain.
+
+### Fetch open threads
+
+Use `mcp__github__pull_request_read` with `method: "get_review_comments"`.
+Filter to threads where **`is_resolved: false`** and **`is_outdated: false`** —
+outdated threads are stale (the code they referenced has since changed) and can
+be ignored.
+
+### For each open thread
+
+1. **Read the comment carefully** — note whether it is labelled Blocking or Non-blocking.
+2. **Decide**:
+   - **Fix** — implement the change, commit, then reply citing the commit hash and
+     what was done.
+   - **Acknowledge / Won't fix** — reply with a clear rationale (e.g. duplicate of
+     a prior thread, out of scope for this PR, trade-off accepted). No code change
+     needed.
+3. **Reply in the thread** using `mcp__github__add_reply_to_pull_request_comment`
+   with `commentId` set to the ID of the **first** comment in the thread (the
+   reviewer's original comment, not a prior reply).
+
+### Severity guide
+
+| Label | Action |
+|-------|--------|
+| **Blocking** | Must be fixed or explicitly declined with justification before merge |
+| **Non-blocking** | Should be fixed or acknowledged; declining is acceptable with rationale |
+| *(unlabelled)* | Style/tidiness — fix if trivial, acknowledge otherwise |
+
+### Push and re-check
+
+After addressing all open threads, push:
+
+```bash
+git push origin <branch-name>
+```
+
+Copilot will review the updated diff and may open new threads. Re-run this step
+until `get_review_comments` returns no unresolved, non-outdated threads.
+
+### Merge gate
+
+- All **blocking** threads resolved (fixed or declined with justification)
+- All **non-blocking** threads acknowledged
+- CI green (`gh pr checks <PR-number> --repo whispr-messenger/scheduling-service`)
+
+---
+
+## 9. Merge the PR
+
+Once all CI checks are green, use `mcp__github__merge_pull_request`:
+
+```json
+{
+  "owner": "whispr-messenger",
+  "repo": "scheduling-service",
+  "pullNumber": <number>,
+  "merge_method": "squash"
+}
+```
+
+Always use **squash** merge to keep `main` history linear.
+
+---
+
+## 10. Close the Jira ticket
+
+Use `mcp__atlassian__transitionJiraIssue` with the transition whose `name` is
+`"Terminé"` (currently id `"31"`) to move the ticket to done.
+
+---
+
+## 11. Return to main and refresh the index
+
+```bash
+git checkout main
+git pull origin main
+npx gitnexus analyze --embeddings --force
+```
+
+The `--force` flag is required after a squash merge: GitNexus compares commit hashes and will silently skip re-indexing if it considers the index already up to date. `--force` ensures embeddings are always regenerated.
+
+---
+
+## Jira transition IDs (current)
+
+| Name | ID |
+|------|----|
+| À faire | `11` |
+| En cours | `21` |
+| Terminé | `31` |
+
+These IDs are stable but can be verified with
+`mcp__atlassian__getTransitionsForJiraIssue` if in doubt.
+
+---
+
+## Jira MCP — Usage Notes
+
+### Tool parameter types
+
+`mcp__atlassian__searchJiraIssuesUsingJql` requires:
+- `maxResults`: **number**, not string (e.g. `10`, not `"10"`)
+- `fields`: **array**, not string (e.g. `["summary", "status"]`, not `"summary,status"`)
+
+### Fetching the sprint ID for issue creation
+
+`mcp__atlassian__createJiraIssue` requires a **numeric** sprint ID in `additional_fields.customfield_10020`, not a name string.
+
+To get it, query an existing issue from the target sprint and read `customfield_10020[0].id`:
+
+```json
+// mcp__atlassian__searchJiraIssuesUsingJql
+{
+  "jql": "project = WHISPR AND sprint in openSprints()",
+  "fields": ["customfield_10020"],
+  "maxResults": 1
+}
+// → customfield_10020[0].id  (e.g. 200 for Sprint 6)
+```
+
+Then pass it as a number in `createJiraIssue`:
+
+```json
+// mcp__atlassian__createJiraIssue
+{
+  "additional_fields": { "customfield_10020": 200 }
+}
+```
+
+### Current sprint
+
+| Sprint | ID | Board ID |
+|--------|----|----------|
+| Sprint 6 | `200` | `34` |
+
+### Tools that do NOT work
+
+- `mcp__atlassian__jiraRead` — requires an `action` enum parameter, not a free-form URL; not useful for agile/sprint endpoints.
+- `mcp__atlassian__fetch` — requires an `id` parameter; cannot be used for arbitrary REST calls.
+
+---
+
+## Task Tracking with Beads
+
+This repository uses **beads** (`bd`) — a git-backed, graph-based issue tracker optimised for AI agents — for local task tracking within a session or across long-horizon work.
+
+Beads uses a Dolt (version-controlled SQL) database and assigns each task a short hash ID (e.g. `bd-a1b2`) to avoid merge collisions in multi-agent workflows.
+
+### Key commands
+
+| Command | Purpose |
+|---------|---------|
+| `bd ready` | List tasks with no blocking dependencies (pick your next task here) |
+| `bd create "Title" -p 0` | Create a new task (`-p 0` = highest priority) |
+| `bd update <id> --claim` | Atomically assign the task to yourself and mark it in-progress |
+| `bd dep add <child> <parent>` | Declare that `<child>` depends on `<parent>` |
+| `bd show <id>` | Show task details and history |
+
+### Task hierarchy
+
+Tasks use dot notation: `bd-a3f8` (epic) → `bd-a3f8.1` (task) → `bd-a3f8.1.1` (subtask).
+
+### Workflow
+
+1. Run `bd ready` to see what is available.
+2. Run `bd update <id> --claim` to take ownership and start work.
+3. Use `bd dep add` to express blocking relationships between tasks.
+4. Close tasks with `bd update <id> --status done` when complete.
+
+Use beads for **in-session planning and subtask decomposition**. Jira remains the source of truth for sprint-level tickets.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **scheduling-service**. Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+> **Naming note:** In prose and examples below, `gitnexus_impact(...)` is shorthand for the MCP tool `mcp__gitnexus__impact`. The two names refer to the same tool.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## When Debugging
+
+1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
+2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
+3. `READ gitnexus://repo/scheduling-service/process/{processName}` — trace the full execution flow step by step
+4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
+
+## When Refactoring
+
+- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview — graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
+- **Extracting/Splitting**: MUST run `gitnexus_context({name: "target"})` to see all incoming/outgoing refs, then `gitnexus_impact({target: "target", direction: "upstream"})` to find all external callers before moving code.
+- After any refactor: run `gitnexus_detect_changes({scope: "all"})` to verify only expected files changed.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Tools Quick Reference
+
+| Tool | When to use | Command |
+|------|-------------|---------|
+| `query` | Find code by concept | `gitnexus_query({query: "upload quota"})` |
+| `context` | 360-degree view of one symbol | `gitnexus_context({name: "uploadMedia"})` |
+| `impact` | Blast radius before editing | `gitnexus_impact({target: "X", direction: "upstream"})` |
+| `detect_changes` | Pre-commit scope check | `gitnexus_detect_changes({scope: "staged"})` |
+| `rename` | Safe multi-file rename | `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` |
+| `cypher` | Custom graph queries | `gitnexus_cypher({query: "MATCH ..."})` |
+
+## Impact Risk Levels
+
+| Depth | Meaning | Action |
+|-------|---------|--------|
+| d=1 | WILL BREAK — direct callers/importers | MUST update these |
+| d=2 | LIKELY AFFECTED — indirect deps | Should test |
+| d=3 | MAY NEED TESTING — transitive | Test if critical path |
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/scheduling-service/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/scheduling-service/clusters` | All functional areas |
+| `gitnexus://repo/scheduling-service/processes` | All execution flows |
+| `gitnexus://repo/scheduling-service/process/{name}` | Step-by-step execution trace |
+
+## Self-Check Before Finishing
+
+Before completing any code modification task, verify:
+1. `gitnexus_impact` was run for all modified symbols
+2. No HIGH/CRITICAL risk warnings were ignored
+3. `gitnexus_detect_changes()` confirms changes match expected scope
+4. All d=1 (WILL BREAK) dependents were updated
+
+## Keeping the Index Fresh
+
+After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
+
+```bash
+npx gitnexus analyze
+```
+
+If the index previously included embeddings, preserve them by adding `--embeddings`:
+
+```bash
+npx gitnexus analyze --embeddings
+```
+
+To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
+
+> Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
+
+## CLI
+
+These skills are configured in the Claude workspace (not stored in this repository).
+
+| Task | Skill name |
+|------|-----------|
+| Understand architecture / "How does X work?" | `gitnexus-exploring` |
+| Blast radius / "What breaks if I change X?" | `gitnexus-impact-analysis` |
+| Trace bugs / "Why is X failing?" | `gitnexus-debugging` |
+| Rename / extract / split / refactor | `gitnexus-refactoring` |
+| Tools, resources, schema reference | `gitnexus-guide` |
+| Index, status, clean, wiki CLI commands | `gitnexus-cli` |
+
+<!-- gitnexus:end -->
