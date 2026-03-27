@@ -13,6 +13,7 @@ import { typeOrmModuleOptionsFactory } from './typeorm';
 import { cacheModuleOptionsFactory } from './cache';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from '../health/health.module';
+import { AuthModule } from '../auth/auth.module';
 
 // Environment variables
 const configModuleOptions: ConfigModuleOptions = {
@@ -95,6 +96,7 @@ const throttlerGuardProvider: Provider = {
 		BullModule.forRootAsync(bullModuleAsyncOptions),
 		ScheduleModule.forRoot(),
 		HealthModule,
+		AuthModule,
 		DatabaseModule,
 		MonitoringModule,
 		SchedulerModule,

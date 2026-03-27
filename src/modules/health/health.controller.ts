@@ -3,9 +3,11 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('Health')
 @Controller('health')
+@Public()
 export class HealthController {
 	constructor(
 		private readonly dataSource: DataSource,
