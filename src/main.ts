@@ -104,7 +104,7 @@ async function bootstrap() {
 	await app.listen(port, '0.0.0.0');
 
 	logger.log(`🚀 Whispr Scheduling Service is running on port ${port}`);
-	logger.log(`📊 Health check available at http://localhost:${port}/api/v1/monitoring/health`);
+	logger.log(`📊 Health check available at http://localhost:${port}/health`);
 	logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
 	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {

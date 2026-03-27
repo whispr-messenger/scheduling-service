@@ -17,7 +17,7 @@ const port = parseInt(process.env.HTTP_PORT || '3000', 10);
 const options: RequestOptions = {
 	hostname: 'localhost',
 	port,
-	path: '/api/v1/monitoring/health/ready',
+	path: '/health/ready',
 	method: 'GET',
 	timeout: 3000,
 };
