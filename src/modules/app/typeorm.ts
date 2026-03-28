@@ -8,6 +8,7 @@ import { ExecutionLog } from '../scheduler/entities/execution-log.entity';
 import { RecurringJob } from '../scheduler/entities/recurring-job.entity';
 import { JobDependency } from '../scheduler/entities/job-dependency.entity';
 import { DataSourceOptions } from 'typeorm';
+import { InitialSchema1743070800000 } from './migrations/1743070800000-InitialSchema';
 
 // Register new TypeORM entities here
 const ENTITIES = [Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency];
@@ -60,7 +61,7 @@ function getDataSourceOptions(configService: ConfigService): DataSourceOptions {
 		logging: configService.get('DB_LOGGING', 'false') === 'true',
 		// Migrations to be loaded and used for this data source
 		// Explicit path (no glob) avoids DirectoryExportedClassesLoader infinite recursion (stack overflow)
-		migrations: [__dirname + '/migrations/1743070800000-InitialSchema'],
+		migrations: [InitialSchema1743070800000],
 		// Indicates if migrations should be auto-run on every application launch.
 		migrationsRun: configService.get('DB_MIGRATIONS_RUN', 'false') === 'true',
 		// Indicates if database schema should be auto created on every application launch.
