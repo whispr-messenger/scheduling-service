@@ -87,21 +87,26 @@ const throttlerGuardProvider: Provider = {
 	useClass: ThrottlerGuard,
 };
 
+const MODULE_IMPORTS = [
+	ConfigModule.forRoot(configModuleOptions),
+	CacheModule.registerAsync(cacheModuleAsyncOptions),
+	ThrottlerModule.forRoot(throttlerModuleOptions),
+	BullModule.forRootAsync(bullModuleAsyncOptions),
+	ScheduleModule.forRoot(),
+	HealthModule,
+	AuthModule,
+	DatabaseModule,
+	MonitoringModule,
+	SchedulerModule,
+	QueuesModule,
+] as any[];
+
+if (process.env.DB_DISABLE !== 'true' && process.env.NODE_ENV !== 'test') {
+	MODULE_IMPORTS.splice(1, 0, TypeOrmModule.forRootAsync(typeOrmModuleAsyncOptions));
+}
+
 @Module({
-	imports: [
-		ConfigModule.forRoot(configModuleOptions),
-		TypeOrmModule.forRootAsync(typeOrmModuleAsyncOptions),
-		CacheModule.registerAsync(cacheModuleAsyncOptions),
-		ThrottlerModule.forRoot(throttlerModuleOptions),
-		BullModule.forRootAsync(bullModuleAsyncOptions),
-		ScheduleModule.forRoot(),
-		HealthModule,
-		AuthModule,
-		DatabaseModule,
-		MonitoringModule,
-		SchedulerModule,
-		QueuesModule,
-	],
+	imports: MODULE_IMPORTS,
 	providers: [throttlerGuardProvider],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 #!/bin/bash
 
-npm install --legacy-peer-deps
+set -e
 
-npm run start:dev
+npm run build
+npm run start:prod

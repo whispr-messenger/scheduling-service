@@ -8,13 +8,7 @@ beforeAll(async () => {
 	process.env.GRPC_PORT = process.env.GRPC_PORT || '50053';
 
 	// Database — use env vars if provided, otherwise fall back to k3d dev defaults
-	process.env.DB_HOST = process.env.DB_HOST || 'localhost';
-	process.env.DB_PORT = process.env.DB_PORT || '5432';
-	process.env.DB_USERNAME = process.env.DB_USERNAME || 'whispr';
-	process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'whispr_dev_password'; // NOSONAR - test environment default, not a real credential
-	process.env.DB_NAME = process.env.DB_NAME || 'scheduling_service_db';
-	process.env.DB_SYNCHRONIZE = process.env.DB_SYNCHRONIZE || 'false';
-	process.env.DB_MIGRATIONS_RUN = process.env.DB_MIGRATIONS_RUN || 'false';
+	process.env.DB_DISABLE = 'true';
 
 	// Redis
 	process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';

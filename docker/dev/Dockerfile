@@ -8,6 +8,15 @@ RUN apt-get update && apt-get install -y $(cat requirements.txt) \
 EXPOSE 3000 9229
 
 WORKDIR /workspace
+
+COPY package.json package-lock.json ./
+RUN npm config set fetch-retries 10 \
+    && npm config set fetch-retry-factor 2 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && npm config set fetch-timeout 120000 \
+    && npm ci --include=dev --legacy-peer-deps
+
 COPY . .
 
 COPY ./docker/dev/entrypoint.sh /tmp/entrypoint.sh
