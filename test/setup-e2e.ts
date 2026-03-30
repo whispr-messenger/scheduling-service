@@ -8,7 +8,10 @@ beforeAll(async () => {
 	process.env.GRPC_PORT = process.env.GRPC_PORT || '50053';
 
 	// Database — use env vars if provided, otherwise fall back to k3d dev defaults
-	process.env.DB_DISABLE = 'true';
+	process.env.DB_TYPE = process.env.DB_TYPE || 'better-sqlite3';
+	process.env.DB_SYNCHRONIZE = process.env.DB_SYNCHRONIZE || 'true';
+	process.env.DB_MIGRATIONS_RUN = process.env.DB_MIGRATIONS_RUN || 'false';
+	process.env.DB_LOGGING = process.env.DB_LOGGING || 'false';
 
 	// Redis
 	process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';

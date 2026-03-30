@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/modules/app/app.module';
 import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
+import { TestAppModule } from './test-app.module';
 
 describe('SchedulingService (e2e)', () => {
 	let app: INestApplication;
 
 	beforeAll(async () => {
 		const moduleFixture: TestingModule = await Test.createTestingModule({
-			imports: [AppModule],
+			imports: [TestAppModule],
 		})
 			// Bypass JWT auth so e2e tests can reach business logic without a real JWKS server.
 			// JwtAuthGuard is registered as APP_GUARD via `useExisting: JwtAuthGuard`, so
@@ -19,6 +19,13 @@ describe('SchedulingService (e2e)', () => {
 			.compile();
 
 		app = moduleFixture.createNestApplication();
+		app.useGlobalPipes(
+			new ValidationPipe({
+				whitelist: true,
+				forbidNonWhitelisted: true,
+				transform: true,
+			})
+		);
 		await app.init();
 	});
 

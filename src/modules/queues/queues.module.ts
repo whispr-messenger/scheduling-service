@@ -8,9 +8,16 @@ import {
 } from './processors/job.processor';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 
-@Module({
-	imports: [
-		forwardRef(() => SchedulerModule),
+const QUEUE_IMPORTS = [forwardRef(() => SchedulerModule)] as any[];
+const QUEUE_PROVIDERS = [
+	QueueService,
+	HighPriorityJobProcessor,
+	MediumPriorityJobProcessor,
+	LowPriorityJobProcessor,
+] as any[];
+
+if (process.env.NODE_ENV !== 'test') {
+	QUEUE_IMPORTS.push(
 		BullModule.registerQueue(
 			{
 				name: 'high-priority',
@@ -48,9 +55,27 @@ import { SchedulerModule } from '../scheduler/scheduler.module';
 					},
 				},
 			}
-		),
-	],
-	providers: [QueueService, HighPriorityJobProcessor, MediumPriorityJobProcessor, LowPriorityJobProcessor],
+		)
+	);
+} else {
+	QUEUE_PROVIDERS.splice(0, QUEUE_PROVIDERS.length, {
+		provide: QueueService,
+		useValue: {
+			addJob: async () => ({ id: 'test' }),
+			addRepeatableJob: async () => ({ id: 'test' }),
+			removeJob: async () => {},
+			getQueueStats: async () => ({
+				highPriority: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 },
+				mediumPriority: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 },
+				lowPriority: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 },
+			}),
+		},
+	});
+}
+
+@Module({
+	imports: QUEUE_IMPORTS,
+	providers: QUEUE_PROVIDERS,
 	exports: [QueueService],
 })
 export class QueuesModule {}

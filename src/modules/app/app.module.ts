@@ -89,9 +89,9 @@ const throttlerGuardProvider: Provider = {
 
 const MODULE_IMPORTS = [
 	ConfigModule.forRoot(configModuleOptions),
+	TypeOrmModule.forRootAsync(typeOrmModuleAsyncOptions),
 	CacheModule.registerAsync(cacheModuleAsyncOptions),
 	ThrottlerModule.forRoot(throttlerModuleOptions),
-	BullModule.forRootAsync(bullModuleAsyncOptions),
 	ScheduleModule.forRoot(),
 	HealthModule,
 	AuthModule,
@@ -101,8 +101,8 @@ const MODULE_IMPORTS = [
 	QueuesModule,
 ] as any[];
 
-if (process.env.DB_DISABLE !== 'true' && process.env.NODE_ENV !== 'test') {
-	MODULE_IMPORTS.splice(1, 0, TypeOrmModule.forRootAsync(typeOrmModuleAsyncOptions));
+if (process.env.NODE_ENV !== 'test') {
+	MODULE_IMPORTS.splice(4, 0, BullModule.forRootAsync(bullModuleAsyncOptions));
 }
 
 @Module({

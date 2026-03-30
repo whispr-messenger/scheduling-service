@@ -76,6 +76,18 @@ function getDataSourceOptions(configService: ConfigService): DataSourceOptions {
 export async function typeOrmModuleOptionsFactory(
 	configService: ConfigService
 ): Promise<TypeOrmModuleOptions> {
+	if (configService.get('NODE_ENV') === 'test') {
+		return {
+			type: 'better-sqlite3',
+			database: ':memory:',
+			entities: ENTITIES,
+			synchronize: true,
+			logging: false,
+			migrationsRun: false,
+			dropSchema: true,
+		} as TypeOrmModuleOptions;
+	}
+
 	const databaseUrl = configService.get('DB_URL');
 	const databaseConfig = databaseUrl ? parseDatabaseUrl(databaseUrl) : getEnvDatabaseConfig(configService);
 
