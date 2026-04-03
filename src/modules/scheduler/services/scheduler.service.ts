@@ -404,12 +404,14 @@ export class SchedulerService {
 				// 	metadata: payload.metadata,
 				// 	scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : new Date(),
 				// });
+				break;
 
 			case 'cleanupExpiredMessages':
 				// return await this.messagingClient.cleanupExpiredMessages({
 				// 	olderThan: new Date(payload.olderThan),
 				// 	batchSize: payload.batchSize,
 				// });
+				break;
 
 			default:
 				throw new Error(`Unknown messaging method: ${job.targetMethod}`);
