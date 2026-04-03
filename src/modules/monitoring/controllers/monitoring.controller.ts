@@ -36,10 +36,10 @@ export class MonitoringController {
 		private readonly configService: ConfigService
 	) {
 		this.redis = new Redis({
-			host: this.configService.get<string>('redis.host') || 'localhost',
-			port: this.configService.get<number>('redis.port') || 6379,
-			password: this.configService.get<string>('redis.password'),
-			db: this.configService.get<number>('redis.db') || 0,
+			host: this.configService.get('REDIS_HOST', 'localhost'),
+			port: parseInt(this.configService.get('REDIS_PORT', '6379'), 10),
+			password: this.configService.get('REDIS_PASSWORD'),
+			db: parseInt(this.configService.get('REDIS_DB', '0'), 10),
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,

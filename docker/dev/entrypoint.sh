@@ -1,5 +1,9 @@
 #!/bin/bash
 
-npm install --legacy-peer-deps
+set -e
 
-npm run start:dev
+if [ ! -d node_modules ]; then
+  npm install --legacy-peer-deps --no-prepare
+fi
+
+npx nest start --watch

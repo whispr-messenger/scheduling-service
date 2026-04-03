@@ -46,6 +46,9 @@ async function bootstrap() {
 	// Global logging interceptor
 	app.useGlobalInterceptors(new LoggingInterceptor());
 
+	// Align HTTP routes with ingress path (/scheduling/*)
+	app.setGlobalPrefix('scheduling');
+
 	// Swagger configuration
 	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
 		const config = new DocumentBuilder()
@@ -89,7 +92,7 @@ async function bootstrap() {
 				defaults: true,
 				oneofs: true,
 			},
-			onLoadPackageDefinition: (pkg, server) => {
+			onLoadPackageDefinition: (pkg: any, server: any) => {
 				new ReflectionService(pkg).addToServer(server);
 			},
 		},
@@ -100,7 +103,11 @@ async function bootstrap() {
 	logger.log(`gRPC server is listening on ${grpcUrl}`);
 
 	// Start HTTP server
+<<<<<<< Updated upstream
 	const port = configService.get('HTTP_PORT', '3000');
+=======
+	const port = parseInt(configService.get('HTTP_PORT', '3000'), 10);
+>>>>>>> Stashed changes
 	await app.listen(port, '0.0.0.0');
 
 	logger.log(`🚀 Whispr Scheduling Service is running on port ${port}`);
