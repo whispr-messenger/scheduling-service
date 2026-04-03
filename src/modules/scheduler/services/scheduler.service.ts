@@ -34,7 +34,7 @@ export class SchedulerService {
 		private readonly executionRepository: Repository<Execution>,
 		@InjectRepository(JobCategory)
 		private readonly jobCategoryRepository: Repository<JobCategory>,
-		private readonly queueService: QueueService,
+		private readonly queueService: QueueService
 		// @Inject(forwardRef(() => MessagingGrpcClient))
 		// private readonly messagingClient: MessagingGrpcClient
 	) {}
