@@ -3,7 +3,7 @@
     "assets": [
       {
         "include": "**/*.proto",
-        "outDir": "dist/src"
+        "outDir": "dist"
       }
     ],
     "watchAssets": true

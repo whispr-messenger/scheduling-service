@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
 import { GrpcSchedulerService } from './services/grpc-scheduler.service';
-import { MessagingGrpcClient } from './clients/messaging.client';
+// import { MessagingGrpcClient } from './clients/messaging.client';
 import { SchedulerModule } from '@/modules/scheduler/scheduler.module';
 import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
 
@@ -35,7 +35,7 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
 		forwardRef(() => SchedulerModule),
 		forwardRef(() => MonitoringModule),
 	],
-	providers: [GrpcSchedulerService, MessagingGrpcClient],
-	exports: [GrpcSchedulerService, MessagingGrpcClient],
+	providers: [GrpcSchedulerService], // MessagingGrpcClient removed
+	exports: [GrpcSchedulerService], // MessagingGrpcClient removed
 })
 export class GrpcModule {}

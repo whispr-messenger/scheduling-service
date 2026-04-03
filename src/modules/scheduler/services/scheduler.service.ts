@@ -5,8 +5,8 @@ import {
 	NotFoundException,
 	BadRequestException,
 	InternalServerErrorException,
-	Inject,
-	forwardRef,
+	// Inject,
+	// forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,7 +18,7 @@ import { CronUtil } from '@/common/utils/cron.util';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { RetryUtil } from '@/common/utils/retry.util';
 import { QueueService } from '@/modules/queues/services/queue.service';
-import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
+// import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -35,8 +35,8 @@ export class SchedulerService {
 		@InjectRepository(JobCategory)
 		private readonly jobCategoryRepository: Repository<JobCategory>,
 		private readonly queueService: QueueService,
-		@Inject(forwardRef(() => MessagingGrpcClient))
-		private readonly messagingClient: MessagingGrpcClient
+		// @Inject(forwardRef(() => MessagingGrpcClient))
+		// private readonly messagingClient: MessagingGrpcClient
 	) {}
 
 	async createJob(createJobDto: CreateJobDto): Promise<JobResponseDto> {
@@ -396,20 +396,20 @@ export class SchedulerService {
 
 		switch (job.targetMethod) {
 			case 'sendScheduledMessage':
-				return await this.messagingClient.sendScheduledMessage({
-					conversationId: payload.conversationId,
-					senderId: payload.senderId,
-					messageType: payload.messageType || 'TEXT',
-					content: payload.content,
-					metadata: payload.metadata,
-					scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : new Date(),
-				});
+				// return await this.messagingClient.sendScheduledMessage({
+				// 	conversationId: payload.conversationId,
+				// 	senderId: payload.senderId,
+				// 	messageType: payload.messageType || 'TEXT',
+				// 	content: payload.content,
+				// 	metadata: payload.metadata,
+				// 	scheduledFor: payload.scheduledFor ? new Date(payload.scheduledFor) : new Date(),
+				// });
 
 			case 'cleanupExpiredMessages':
-				return await this.messagingClient.cleanupExpiredMessages({
-					olderThan: new Date(payload.olderThan),
-					batchSize: payload.batchSize,
-				});
+				// return await this.messagingClient.cleanupExpiredMessages({
+				// 	olderThan: new Date(payload.olderThan),
+				// 	batchSize: payload.batchSize,
+				// });
 
 			default:
 				throw new Error(`Unknown messaging method: ${job.targetMethod}`);
