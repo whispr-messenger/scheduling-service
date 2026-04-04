@@ -6,7 +6,6 @@ import { Cache } from 'cache-manager';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Health')
-@Public()
 @Controller('health')
 @Public()
 export class HealthController {

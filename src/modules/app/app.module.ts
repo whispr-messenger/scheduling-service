@@ -102,7 +102,6 @@ const throttlerGuardProvider: Provider = {
 		MonitoringModule,
 		SchedulerModule,
 		QueuesModule,
-		AuthModule,
 	],
 	providers: [throttlerGuardProvider, CacheShutdownService],
 })
