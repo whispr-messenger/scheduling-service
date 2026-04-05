@@ -8,7 +8,7 @@ const logger = new Logger('CacheModule');
 export function createRedisStore(redisUrl: string): KeyvRedis<unknown> {
 	const store = new KeyvRedis(redisUrl);
 
-	const safeUrl = redisUrl.replace(/:\/\/[^:]+:[^@]+@/, '://*****@');
+	const safeUrl = redisUrl.replace(/:\/\/[^@]*@/, '://*****@');
 
 	store.on('connect', () => {
 		logger.log(`Redis connected (${safeUrl})`);
@@ -36,7 +36,10 @@ export function createRedisStore(redisUrl: string): KeyvRedis<unknown> {
 export function cacheModuleOptionsFactory(configService: ConfigService): CacheOptions {
 	const redis_host = configService.get('REDIS_HOST', 'redis');
 	const redis_port = configService.get('REDIS_PORT', 6379);
-	const redis_url = `redis://${redis_host}:${redis_port}`;
+	const redis_password = configService.get('REDIS_PASSWORD');
+	const redis_url = redis_password
+		? `redis://:${redis_password}@${redis_host}:${redis_port}`
+		: `redis://${redis_host}:${redis_port}`;
 
 	return {
 		stores: [createRedisStore(redis_url)],

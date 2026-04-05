@@ -86,8 +86,14 @@ describe('Cache Module', () => {
 			expect(warnSpy).toHaveBeenCalledWith('Redis reconnecting...');
 		});
 
-		it('should mask credentials in the logged URL', () => {
+		it('should mask credentials in the logged URL (user:pass format)', () => {
 			createRedisStore('redis://user:secret@redis-host:6379');
+			eventHandlers['connect']();
+			expect(logSpy).toHaveBeenCalledWith('Redis connected (redis://*****@redis-host:6379)');
+		});
+
+		it('should mask credentials in the logged URL (password-only format)', () => {
+			createRedisStore('redis://:mysecret@redis-host:6379');
 			eventHandlers['connect']();
 			expect(logSpy).toHaveBeenCalledWith('Redis connected (redis://*****@redis-host:6379)');
 		});
@@ -119,6 +125,21 @@ describe('Cache Module', () => {
 			cacheModuleOptionsFactory(configService);
 
 			expect(KeyvRedis).toHaveBeenCalledWith('redis://custom-host:6380');
+		});
+
+		it('should include password in URL when REDIS_PASSWORD is set', () => {
+			const configService = {
+				get: jest.fn((key: string, fallback?: any) => {
+					if (key === 'REDIS_PASSWORD') return 's3cret';
+					if (key === 'REDIS_HOST') return 'redis';
+					if (key === 'REDIS_PORT') return 6379;
+					return fallback;
+				}),
+			} as unknown as ConfigService;
+
+			cacheModuleOptionsFactory(configService);
+
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379');
 		});
 	});
 });
