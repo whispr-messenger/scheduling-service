@@ -27,6 +27,8 @@ describe('JwksService', () => {
 	});
 
 	afterEach(() => {
+		// Stop any lingering background retry loops
+		service.onModuleDestroy();
 		jest.restoreAllMocks();
 	});
 
@@ -169,35 +171,205 @@ describe('JwksService', () => {
 		});
 	});
 
-	describe('onModuleInit()', () => {
-		it('should call loadPublicKey on module init', async () => {
-			const spy = jest.spyOn(service, 'loadPublicKey').mockResolvedValue(undefined);
-			await service.onModuleInit();
-			expect(spy).toHaveBeenCalledTimes(1);
+	describe('onModuleInit() — retry behaviour', () => {
+		let sleepSpy: jest.SpyInstance;
+
+		beforeEach(() => {
+			// Mock sleep to resolve immediately so tests don't wait
+			sleepSpy = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
 		});
 
-		it('should not throw when loadPublicKey fails at startup — keeps service not ready', async () => {
-			jest.spyOn(service, 'loadPublicKey').mockRejectedValue(new Error('JWKS unreachable'));
-			await expect(service.onModuleInit()).resolves.toBeUndefined();
+		it('should succeed on first attempt without retrying', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey').mockResolvedValue(undefined);
+			await service.onModuleInit();
+			expect(loadSpy).toHaveBeenCalledTimes(1);
+			expect(sleepSpy).not.toHaveBeenCalled();
+		});
+
+		it('should retry and succeed after transient failures', async () => {
+			const loadSpy = jest
+				.spyOn(service, 'loadPublicKey')
+				.mockRejectedValueOnce(new Error('fail 1'))
+				.mockRejectedValueOnce(new Error('fail 2'))
+				.mockResolvedValueOnce(undefined);
+
+			await service.onModuleInit();
+
+			expect(loadSpy).toHaveBeenCalledTimes(3);
+			// Two failures → two sleeps (before attempt 2 and before attempt 3)
+			expect(sleepSpy).toHaveBeenCalledTimes(2);
+			// Verify exponential backoff: 2000, 4000
+			expect(sleepSpy).toHaveBeenNthCalledWith(1, 2000);
+			expect(sleepSpy).toHaveBeenNthCalledWith(2, 4000);
+		});
+
+		it('should use exponential backoff with correct delays', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey');
+			// Fail first 2, succeed on 3rd
+			loadSpy.mockRejectedValueOnce(new Error('fail 1'));
+			loadSpy.mockRejectedValueOnce(new Error('fail 2'));
+			loadSpy.mockResolvedValueOnce(undefined);
+
+			await service.onModuleInit();
+
+			expect(loadSpy).toHaveBeenCalledTimes(3);
+			// 2 failures → 2 sleeps
+			expect(sleepSpy).toHaveBeenCalledTimes(2);
+			// Verify the delays: 2000, 4000
+			expect(sleepSpy).toHaveBeenNthCalledWith(1, 2000);
+			expect(sleepSpy).toHaveBeenNthCalledWith(2, 4000);
+		});
+
+		it('should abort retries when module is destroyed', async () => {
+			const loadSpy = jest
+				.spyOn(service, 'loadPublicKey')
+				.mockRejectedValueOnce(new Error('fail 1'))
+				.mockRejectedValueOnce(new Error('fail 2'))
+				.mockResolvedValue(undefined);
+
+			// Destroy the module during the second sleep
+			sleepSpy.mockImplementation(async () => {
+				(service as any)._destroyed = true;
+			});
+
+			await service.onModuleInit();
+
+			// Should have tried once, failed, then during sleep _destroyed was set,
+			// so it should stop before trying again
+			expect(loadSpy).toHaveBeenCalledTimes(1);
 			expect(service.isReady()).toBe(false);
 		});
 
-		it('should recover after startup failure when loadPublicKey succeeds later', async () => {
-			// Simulate startup failure
-			jest.spyOn(service, 'loadPublicKey').mockRejectedValueOnce(new Error('JWKS unreachable'));
+		it('should start background retry after all attempts are exhausted', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey');
+			// Fail all 3 attempts
+			for (let i = 0; i < 3; i++) {
+				loadSpy.mockRejectedValueOnce(new Error(`fail ${i + 1}`));
+			}
+			// Background retry will succeed on first try and set primaryPem
+			loadSpy.mockImplementationOnce(async () => {
+				(service as any).primaryPem = 'fake-pem';
+			});
+
+			const bgSpy = jest.spyOn(service as any, 'continueBackgroundRetry');
+
 			await service.onModuleInit();
-			expect(service.isReady()).toBe(false);
 
-			// Simulate successful reload triggered later
-			jest.spyOn(service, 'loadPublicKey').mockResolvedValueOnce(undefined);
-			jest.spyOn(globalThis, 'fetch').mockResolvedValue({
-				ok: true,
-				json: jest.fn().mockResolvedValue({ keys: [ES256_JWK] }),
-			} as unknown as Response);
+			expect(bgSpy).toHaveBeenCalledTimes(1);
 
-			await service.loadPublicKey();
-			// After manual reload succeeds, service should still function
-			expect(service.loadPublicKey).toHaveBeenCalled();
+			// Let background retry microtask settle
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			// 3 failed attempts + 1 successful background retry
+			expect(loadSpy).toHaveBeenCalledTimes(4);
+			expect(service.isReady()).toBe(true);
+		});
+	});
+
+	describe('continueBackgroundRetry()', () => {
+		let sleepSpy: jest.SpyInstance;
+
+		beforeEach(() => {
+			sleepSpy = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+		});
+
+		it('should keep retrying until loadPublicKey succeeds', async () => {
+			const loadSpy = jest
+				.spyOn(service, 'loadPublicKey')
+				.mockRejectedValueOnce(new Error('bg fail 1'))
+				.mockRejectedValueOnce(new Error('bg fail 2'))
+				.mockImplementation(async () => {
+					// Simulate success by setting primaryPem so isReady() returns true
+					(service as any).primaryPem = 'fake-pem';
+				});
+
+			(service as any).continueBackgroundRetry();
+
+			// Let all microtasks flush
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			expect(loadSpy).toHaveBeenCalledTimes(3);
+			expect(sleepSpy).toHaveBeenCalledWith(30000);
+			expect(service.isReady()).toBe(true);
+		});
+
+		it('should stop when module is destroyed', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey').mockRejectedValue(new Error('fail'));
+
+			// Destroy after one sleep
+			let callCount = 0;
+			sleepSpy.mockImplementation(async () => {
+				callCount++;
+				if (callCount >= 2) {
+					(service as any)._destroyed = true;
+				}
+			});
+
+			(service as any).continueBackgroundRetry();
+
+			// Flush microtasks
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			// Should have stopped after _destroyed was set
+			expect(loadSpy.mock.calls.length).toBeLessThanOrEqual(2);
+		});
+
+		it('should skip fetch if key was loaded by another path during sleep', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey');
+
+			// Simulate key becoming ready during the sleep
+			sleepSpy.mockImplementation(async () => {
+				(service as any).primaryPem = 'loaded-by-another-path';
+			});
+
+			(service as any).continueBackgroundRetry();
+
+			// Flush microtasks
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			// loadPublicKey should never be called — isReady() was true after sleep
+			expect(loadSpy).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('onModuleDestroy()', () => {
+		it('should set _destroyed flag to true', () => {
+			expect((service as any)._destroyed).toBe(false);
+			service.onModuleDestroy();
+			expect((service as any)._destroyed).toBe(true);
+		});
+
+		it('should clear pending timers and debounce timer', () => {
+			const clearSpy = jest.spyOn(globalThis, 'clearTimeout');
+
+			// Simulate a pending timer
+			const fakeHandle = globalThis.setTimeout(() => {}, 99999);
+			(service as any).pendingTimers.add(fakeHandle);
+
+			// Simulate a debounce timer
+			const debounceHandle = globalThis.setTimeout(() => {}, 99999);
+			(service as any).reloadDebounceTimer = debounceHandle;
+
+			service.onModuleDestroy();
+
+			expect(clearSpy).toHaveBeenCalledWith(fakeHandle);
+			expect(clearSpy).toHaveBeenCalledWith(debounceHandle);
+			expect((service as any).pendingTimers.size).toBe(0);
+			expect((service as any).reloadDebounceTimer).toBeNull();
 		});
 	});
 
