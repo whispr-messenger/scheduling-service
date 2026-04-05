@@ -95,6 +95,9 @@ async function bootstrap() {
 		},
 	});
 
+	// Enable shutdown hooks so NestJS lifecycle events (onModuleDestroy) fire on app.close()
+	app.enableShutdownHooks();
+
 	// Start microservices
 	await app.startAllMicroservices();
 	logger.log(`gRPC server is listening on ${grpcUrl}`);
@@ -111,17 +114,13 @@ async function bootstrap() {
 		logger.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
 	}
 
-	// Graceful shutdown
-	process.on('SIGTERM', async () => {
+	// Graceful shutdown logging (enableShutdownHooks handles SIGTERM/SIGINT → app.close())
+	process.on('SIGTERM', () => {
 		logger.log('SIGTERM received, shutting down gracefully...');
-		await app.close();
-		process.exit(0);
 	});
 
-	process.on('SIGINT', async () => {
+	process.on('SIGINT', () => {
 		logger.log('SIGINT received, shutting down gracefully...');
-		await app.close();
-		process.exit(0);
 	});
 }
 
