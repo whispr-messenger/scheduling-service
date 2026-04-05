@@ -19,7 +19,10 @@ export class CacheShutdownService implements OnModuleDestroy {
 			await Promise.race([
 				this.cacheManager.disconnect(),
 				new Promise<never>((_, reject) => {
-					timer = setTimeout(() => reject(new Error('Cache disconnect timed out')), SHUTDOWN_TIMEOUT_MS);
+					timer = setTimeout(
+						() => reject(new Error('Cache disconnect timed out')),
+						SHUTDOWN_TIMEOUT_MS
+					);
 				}),
 			]);
 			this.logger.log('Redis cache connection closed');
