@@ -9,10 +9,12 @@ const FETCH_TIMEOUT_MS = 5000;
  */
 const RELOAD_DEBOUNCE_MS = 5000;
 
-/** Retry constants for startup JWKS fetch */
-const BACKOFF_INITIAL_MS = 1_000;
-const BACKOFF_CAP_MS = 30_000;
-const BACKOFF_MAX_ATTEMPTS = 10;
+/** Retry constants for startup JWKS fetch — short budget to avoid blocking init */
+const BACKOFF_INITIAL_MS = 2_000;
+const BACKOFF_MAX_ATTEMPTS = 3;
+
+/** Background retry interval after startup attempts are exhausted */
+const BACKGROUND_RETRY_MS = 30_000;
 
 @Injectable()
 export class JwksService implements OnModuleInit, OnModuleDestroy {
@@ -23,6 +25,9 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 	/** Debounce handle – prevents flood of concurrent reload requests. */
 	private reloadPromise: Promise<void> | null = null;
 	private reloadDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Pending timer handles — cleared on destroy to avoid dangling callbacks. */
+	private readonly pendingTimers = new Set<ReturnType<typeof setTimeout>>();
 
 	/** Set to true when the module is destroyed to stop background retries. */
 	private _destroyed = false;
@@ -35,6 +40,14 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 
 	onModuleDestroy(): void {
 		this._destroyed = true;
+		for (const handle of this.pendingTimers) {
+			globalThis.clearTimeout(handle);
+		}
+		this.pendingTimers.clear();
+		if (this.reloadDebounceTimer !== null) {
+			globalThis.clearTimeout(this.reloadDebounceTimer);
+			this.reloadDebounceTimer = null;
+		}
 	}
 
 	async loadPublicKey(): Promise<void> {
@@ -108,7 +121,7 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 		this.logger.log(`ES256 public key(s) loaded successfully from JWKS (${newMap.size} key(s))`);
 	}
 
-	async loadPublicKeyWithRetry(): Promise<void> {
+	private async loadPublicKeyWithRetry(): Promise<void> {
 		let delay = BACKOFF_INITIAL_MS;
 		for (let attempt = 1; attempt <= BACKOFF_MAX_ATTEMPTS; attempt++) {
 			try {
@@ -125,7 +138,7 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 				}
 				if (attempt < BACKOFF_MAX_ATTEMPTS) {
 					await this.sleep(delay);
-					delay = Math.min(delay * 2, BACKOFF_CAP_MS);
+					delay = delay * 2;
 				}
 			}
 			if (this._destroyed) {
@@ -134,7 +147,7 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 			}
 		}
 		this.logger.error(
-			`JWKS load failed after ${BACKOFF_MAX_ATTEMPTS} attempts — continuing background retry every ${BACKOFF_CAP_MS / 1000}s`
+			`JWKS load failed after ${BACKOFF_MAX_ATTEMPTS} attempts — continuing background retry every ${BACKGROUND_RETRY_MS / 1000}s`
 		);
 		this.continueBackgroundRetry();
 	}
@@ -142,8 +155,8 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 	private continueBackgroundRetry(): void {
 		const loop = async (): Promise<void> => {
 			while (!this.isReady() && !this._destroyed) {
-				await this.sleep(BACKOFF_CAP_MS);
-				if (this._destroyed) break;
+				await this.sleep(BACKGROUND_RETRY_MS);
+				if (this._destroyed || this.isReady()) break;
 				try {
 					await this.loadPublicKey();
 					this.logger.log('JWKS background retry succeeded');
@@ -157,7 +170,14 @@ export class JwksService implements OnModuleInit, OnModuleDestroy {
 
 	private sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => {
-			globalThis.setTimeout(resolve, ms);
+			const handle = globalThis.setTimeout(() => {
+				this.pendingTimers.delete(handle);
+				resolve();
+			}, ms);
+			if (typeof handle === 'object' && 'unref' in handle) {
+				handle.unref();
+			}
+			this.pendingTimers.add(handle);
 		});
 	}
 

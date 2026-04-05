@@ -198,29 +198,26 @@ describe('JwksService', () => {
 			expect(loadSpy).toHaveBeenCalledTimes(3);
 			// Two failures → two sleeps (before attempt 2 and before attempt 3)
 			expect(sleepSpy).toHaveBeenCalledTimes(2);
-			// Verify exponential backoff: 1000, 2000
-			expect(sleepSpy).toHaveBeenNthCalledWith(1, 1000);
-			expect(sleepSpy).toHaveBeenNthCalledWith(2, 2000);
+			// Verify exponential backoff: 2000, 4000
+			expect(sleepSpy).toHaveBeenNthCalledWith(1, 2000);
+			expect(sleepSpy).toHaveBeenNthCalledWith(2, 4000);
 		});
 
-		it('should use exponential backoff with cap at 30 000 ms', async () => {
+		it('should use exponential backoff with correct delays', async () => {
 			const loadSpy = jest.spyOn(service, 'loadPublicKey');
-			// Fail 9 times, succeed on 10th
-			for (let i = 0; i < 9; i++) {
-				loadSpy.mockRejectedValueOnce(new Error(`fail ${i + 1}`));
-			}
+			// Fail first 2, succeed on 3rd
+			loadSpy.mockRejectedValueOnce(new Error('fail 1'));
+			loadSpy.mockRejectedValueOnce(new Error('fail 2'));
 			loadSpy.mockResolvedValueOnce(undefined);
 
 			await service.onModuleInit();
 
-			expect(loadSpy).toHaveBeenCalledTimes(10);
-			// 9 failures → 9 sleeps (the last attempt succeeds so no sleep after it)
-			expect(sleepSpy).toHaveBeenCalledTimes(9);
-			// Verify the delays: 1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000, 30000
-			const expectedDelays = [1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000, 30000];
-			for (let i = 0; i < expectedDelays.length; i++) {
-				expect(sleepSpy).toHaveBeenNthCalledWith(i + 1, expectedDelays[i]);
-			}
+			expect(loadSpy).toHaveBeenCalledTimes(3);
+			// 2 failures → 2 sleeps
+			expect(sleepSpy).toHaveBeenCalledTimes(2);
+			// Verify the delays: 2000, 4000
+			expect(sleepSpy).toHaveBeenNthCalledWith(1, 2000);
+			expect(sleepSpy).toHaveBeenNthCalledWith(2, 4000);
 		});
 
 		it('should abort retries when module is destroyed', async () => {
@@ -245,8 +242,8 @@ describe('JwksService', () => {
 
 		it('should start background retry after all attempts are exhausted', async () => {
 			const loadSpy = jest.spyOn(service, 'loadPublicKey');
-			// Fail all 10 attempts
-			for (let i = 0; i < 10; i++) {
+			// Fail all 3 attempts
+			for (let i = 0; i < 3; i++) {
 				loadSpy.mockRejectedValueOnce(new Error(`fail ${i + 1}`));
 			}
 			// Background retry will succeed on first try and set primaryPem
@@ -265,8 +262,8 @@ describe('JwksService', () => {
 			await Promise.resolve();
 			await Promise.resolve();
 
-			// 10 failed attempts + 1 successful background retry
-			expect(loadSpy).toHaveBeenCalledTimes(11);
+			// 3 failed attempts + 1 successful background retry
+			expect(loadSpy).toHaveBeenCalledTimes(4);
 			expect(service.isReady()).toBe(true);
 		});
 	});
@@ -328,6 +325,25 @@ describe('JwksService', () => {
 			// Should have stopped after _destroyed was set
 			expect(loadSpy.mock.calls.length).toBeLessThanOrEqual(2);
 		});
+
+		it('should skip fetch if key was loaded by another path during sleep', async () => {
+			const loadSpy = jest.spyOn(service, 'loadPublicKey');
+
+			// Simulate key becoming ready during the sleep
+			sleepSpy.mockImplementation(async () => {
+				(service as any).primaryPem = 'loaded-by-another-path';
+			});
+
+			(service as any).continueBackgroundRetry();
+
+			// Flush microtasks
+			await Promise.resolve();
+			await Promise.resolve();
+			await Promise.resolve();
+
+			// loadPublicKey should never be called — isReady() was true after sleep
+			expect(loadSpy).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('onModuleDestroy()', () => {
@@ -335,6 +351,25 @@ describe('JwksService', () => {
 			expect((service as any)._destroyed).toBe(false);
 			service.onModuleDestroy();
 			expect((service as any)._destroyed).toBe(true);
+		});
+
+		it('should clear pending timers and debounce timer', () => {
+			const clearSpy = jest.spyOn(globalThis, 'clearTimeout');
+
+			// Simulate a pending timer
+			const fakeHandle = globalThis.setTimeout(() => {}, 99999);
+			(service as any).pendingTimers.add(fakeHandle);
+
+			// Simulate a debounce timer
+			const debounceHandle = globalThis.setTimeout(() => {}, 99999);
+			(service as any).reloadDebounceTimer = debounceHandle;
+
+			service.onModuleDestroy();
+
+			expect(clearSpy).toHaveBeenCalledWith(fakeHandle);
+			expect(clearSpy).toHaveBeenCalledWith(debounceHandle);
+			expect((service as any).pendingTimers.size).toBe(0);
+			expect((service as any).reloadDebounceTimer).toBeNull();
 		});
 	});
 
