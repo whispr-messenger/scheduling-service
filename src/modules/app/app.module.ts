@@ -14,6 +14,7 @@ import { cacheModuleOptionsFactory } from './cache';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from '../health/health.module';
 import { AuthModule } from '../auth/auth.module';
+import { CacheShutdownService } from './cache-shutdown.service';
 
 // Environment variables
 const configModuleOptions: ConfigModuleOptions = {
@@ -102,6 +103,6 @@ const throttlerGuardProvider: Provider = {
 		SchedulerModule,
 		QueuesModule,
 	],
-	providers: [throttlerGuardProvider],
+	providers: [throttlerGuardProvider, CacheShutdownService],
 })
 export class AppModule {}
