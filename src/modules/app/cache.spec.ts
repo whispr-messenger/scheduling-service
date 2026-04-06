@@ -110,7 +110,7 @@ describe('Cache Module', () => {
 			expect(result.ttl).toBe(900);
 			expect(result.max).toBe(1000);
 			expect(result.stores).toHaveLength(1);
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://redis:6379');
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://redis:6379/0');
 		});
 
 		it('should use configured host and port from ConfigService', () => {
@@ -124,7 +124,7 @@ describe('Cache Module', () => {
 
 			cacheModuleOptionsFactory(configService);
 
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://custom-host:6380');
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://custom-host:6380/0');
 		});
 
 		it('should include password in URL when REDIS_PASSWORD is set', () => {
@@ -139,7 +139,23 @@ describe('Cache Module', () => {
 
 			cacheModuleOptionsFactory(configService);
 
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379');
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379/0');
+		});
+
+		it('should include REDIS_DB in URL when set to non-default value', () => {
+			const configService = {
+				get: jest.fn((key: string, fallback?: any) => {
+					if (key === 'REDIS_PASSWORD') return 's3cret';
+					if (key === 'REDIS_HOST') return 'redis';
+					if (key === 'REDIS_PORT') return 6379;
+					if (key === 'REDIS_DB') return 2;
+					return fallback;
+				}),
+			} as unknown as ConfigService;
+
+			cacheModuleOptionsFactory(configService);
+
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379/2');
 		});
 	});
 });
