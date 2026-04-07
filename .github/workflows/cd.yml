@@ -159,10 +159,15 @@ jobs:
           # Update the deployment manifest in the infrastructure repository
           yq -i 'select(.kind == "Deployment").spec.template.spec.containers[0].image = "'"${FULL_IMAGE}"'"' infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml
 
+          # Update the migration job manifest so PreSync always uses the same image
+          yq -i ".spec.template.spec.containers[0].image = \"${FULL_IMAGE}\"" infrastructure/k8s/whispr/production/scheduling-service/migration-job.yaml
+
       - name: Verify update
         run: |
           echo "Updated deployment manifest:"
-          yq '.spec.template.spec.containers[0].image' infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml
+          yq '.spec.template.spec.containers[0].image' infrastructure/k8s/whispr/production/scheduling-service/deployment.yaml
+          echo "Updated migration job manifest:"
+          yq '.spec.template.spec.containers[0].image' infrastructure/k8s/whispr/production/scheduling-service/migration-job.yaml
 
       - name: Commit and push changes
         working-directory: infrastructure
@@ -171,7 +176,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
 
           # Check if there are changes to commit
-          if git diff --quiet k8s/whispr/prod/scheduling-service/deployment.yaml; then
+          if git diff --quiet k8s/whispr/production/scheduling-service/deployment.yaml k8s/whispr/production/scheduling-service/migration-job.yaml; then
             echo "No changes to commit"
             exit 0
           fi
@@ -187,7 +192,7 @@ jobs:
             COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA}"
           fi
 
-          git add k8s/whispr/prod/scheduling-service/deployment.yaml
+          git add k8s/whispr/production/scheduling-service/deployment.yaml k8s/whispr/production/scheduling-service/migration-job.yaml
           git commit -m "${COMMIT_MSG}"
 
           # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
