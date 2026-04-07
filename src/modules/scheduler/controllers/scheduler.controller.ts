@@ -31,7 +31,7 @@ import { JobResponseDto, ScheduleResponseDto, ExecutionResponseDto } from '../dt
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 
 @ApiTags('Scheduler')
-@Controller('api/v1/jobs')
+@Controller('api/jobs')
 @UseInterceptors(LoggingInterceptor)
 export class SchedulerController {
 	constructor(private readonly schedulerService: SchedulerService) {}
