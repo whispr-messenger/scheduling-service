@@ -29,7 +29,7 @@ import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 
 @ApiTags('Scheduled Messages')
 @ApiBearerAuth()
-@Controller('api/v1/scheduled-messages')
+@Controller('api/scheduled-messages')
 @UseInterceptors(LoggingInterceptor)
 export class ScheduledMessagesController {
 	constructor(private readonly scheduledMessagesService: ScheduledMessagesService) {}

@@ -108,7 +108,7 @@ async function bootstrap() {
 
 	logger.log(`🚀 Whispr Scheduling Service is running on port ${port}`);
 	logger.log(`📊 Health check available at http://localhost:${port}/health`);
-	logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
+	logger.log(`📈 Metrics available at http://localhost:${port}/api/monitoring/metrics`);
 
 	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
 		logger.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
