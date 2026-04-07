@@ -53,38 +53,38 @@ describe('SchedulingService (e2e)', () => {
 		});
 	});
 
-	describe('/api/v1/jobs (POST)', () => {
+	describe('/api/jobs (POST)', () => {
 		it('should return 400 for invalid job creation input', async () => {
 			const invalidJobDto = {
 				name: '',
 				payload: null,
 			};
 
-			await request(app.getHttpServer()).post('/api/v1/jobs').send(invalidJobDto).expect(400);
+			await request(app.getHttpServer()).post('/api/jobs').send(invalidJobDto).expect(400);
 		});
 
 		it('should return 400 for missing required fields', async () => {
-			await request(app.getHttpServer()).post('/api/v1/jobs').send({}).expect(400);
+			await request(app.getHttpServer()).post('/api/jobs').send({}).expect(400);
 		});
 	});
 
-	describe('/api/v1/jobs/:jobId (GET)', () => {
+	describe('/api/jobs/:jobId (GET)', () => {
 		it('should return 404 for non-existent job', async () => {
 			const fakeId = '123e4567-e89b-12d3-a456-426614174999';
 
-			await request(app.getHttpServer()).get(`/api/v1/jobs/${fakeId}`).expect(404);
+			await request(app.getHttpServer()).get(`/api/jobs/${fakeId}`).expect(404);
 		});
 
 		it('should return 400 for invalid UUID', async () => {
-			await request(app.getHttpServer()).get('/api/v1/jobs/invalid-uuid').expect(400);
+			await request(app.getHttpServer()).get('/api/jobs/invalid-uuid').expect(400);
 		});
 	});
 
-	describe('/api/v1/jobs/:jobId/execute (POST)', () => {
+	describe('/api/jobs/:jobId/execute (POST)', () => {
 		it('should return 404 for non-existent job execution', async () => {
 			const fakeId = '123e4567-e89b-12d3-a456-426614174999';
 
-			await request(app.getHttpServer()).post(`/api/v1/jobs/${fakeId}/execute`).expect(404);
+			await request(app.getHttpServer()).post(`/api/jobs/${fakeId}/execute`).expect(404);
 		});
 	});
 });
