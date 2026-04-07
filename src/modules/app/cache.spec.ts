@@ -154,9 +154,7 @@ describe('Cache Module', () => {
 
 			cacheModuleOptionsFactory(configService);
 
-			expect(KeyvRedis).toHaveBeenCalledWith(
-				'redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0',
-			);
+			expect(KeyvRedis).toHaveBeenCalledWith('redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0');
 		});
 
 		it('should include REDIS_DB in URL when set to non-default value', () => {
