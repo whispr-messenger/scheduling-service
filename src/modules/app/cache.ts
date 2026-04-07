@@ -18,8 +18,9 @@ export function createRedisStore(redisUrl: string): KeyvRedis<unknown> {
 		logger.log('Redis ready');
 	});
 
-	store.on('error', (error: Error) => {
-		logger.error(`Redis error: ${error?.message ?? error}`, error?.stack);
+	store.on('error', (error: unknown) => {
+		const err = error instanceof Error ? error : undefined;
+		logger.error(`Redis error: ${err?.message ?? error}`, err?.stack);
 	});
 
 	store.on('close', () => {
@@ -39,7 +40,7 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 	const redis_password = configService.get('REDIS_PASSWORD');
 	const redis_db = configService.get<number>('REDIS_DB', 0);
 	const redis_url = redis_password
-		? `redis://:${redis_password}@${redis_host}:${redis_port}/${redis_db}`
+		? `redis://:${encodeURIComponent(redis_password)}@${redis_host}:${redis_port}/${redis_db}`
 		: `redis://${redis_host}:${redis_port}/${redis_db}`;
 
 	return {

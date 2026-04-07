@@ -142,6 +142,23 @@ describe('Cache Module', () => {
 			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379/0');
 		});
 
+		it('should encode reserved characters in REDIS_PASSWORD', () => {
+			const configService = {
+				get: jest.fn((key: string, fallback?: any) => {
+					if (key === 'REDIS_PASSWORD') return 'p@ss:w/rd#1?';
+					if (key === 'REDIS_HOST') return 'redis';
+					if (key === 'REDIS_PORT') return 6379;
+					return fallback;
+				}),
+			} as unknown as ConfigService;
+
+			cacheModuleOptionsFactory(configService);
+
+			expect(KeyvRedis).toHaveBeenCalledWith(
+				'redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0',
+			);
+		});
+
 		it('should include REDIS_DB in URL when set to non-default value', () => {
 			const configService = {
 				get: jest.fn((key: string, fallback?: any) => {
