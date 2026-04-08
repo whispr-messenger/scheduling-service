@@ -35,77 +35,65 @@ describe('Cache Module', () => {
 			(KeyvRedis as unknown as jest.Mock).mockReturnValue(mockStore);
 		});
 
+		const TEST_URL = 'redis://localhost:6379';
+
 		it('should create a KeyvRedis store with the given URL', () => {
-			createRedisStore('redis://localhost:6379');
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://localhost:6379');
+			createRedisStore(TEST_URL);
+			expect(KeyvRedis).toHaveBeenCalledWith(TEST_URL);
 		});
 
 		it('should register connect, ready, error, close, and reconnecting listeners', () => {
-			createRedisStore('redis://localhost:6379');
-			expect(mockStore.on).toHaveBeenCalledWith('connect', expect.any(Function));
-			expect(mockStore.on).toHaveBeenCalledWith('ready', expect.any(Function));
-			expect(mockStore.on).toHaveBeenCalledWith('error', expect.any(Function));
-			expect(mockStore.on).toHaveBeenCalledWith('close', expect.any(Function));
-			expect(mockStore.on).toHaveBeenCalledWith('reconnecting', expect.any(Function));
+			createRedisStore(TEST_URL);
+			const expectedEvents = ['connect', 'ready', 'error', 'close', 'reconnecting'];
+			for (const event of expectedEvents) {
+				expect(mockStore.on).toHaveBeenCalledWith(event, expect.any(Function));
+			}
 		});
 
-		it('should log on connect event', () => {
-			createRedisStore('redis://localhost:6379');
-			eventHandlers['connect']();
-			expect(logSpy).toHaveBeenCalledWith('Redis connected (redis://localhost:6379)');
+		it.each([
+			['connect', 'log', 'Redis connected (redis://localhost:6379)'],
+			['ready', 'log', 'Redis ready'],
+			['close', 'warn', 'Redis connection closed'],
+			['reconnecting', 'warn', 'Redis reconnecting...'],
+		])('should %s on %s event with correct message', (event, level, message) => {
+			createRedisStore(TEST_URL);
+			eventHandlers[event]();
+			const spy = level === 'log' ? logSpy : warnSpy;
+			expect(spy).toHaveBeenCalledWith(message);
 		});
 
-		it('should log on ready event', () => {
-			createRedisStore('redis://localhost:6379');
-			eventHandlers['ready']();
-			expect(logSpy).toHaveBeenCalledWith('Redis ready');
-		});
-
-		it('should log error on error event', () => {
-			createRedisStore('redis://localhost:6379');
+		it('should log error on error event with Error instance', () => {
+			createRedisStore(TEST_URL);
 			const error = new Error('Connection refused');
 			eventHandlers['error'](error);
 			expect(errorSpy).toHaveBeenCalledWith('Redis error: Connection refused', error.stack);
 		});
 
 		it('should handle error event with non-Error values', () => {
-			createRedisStore('redis://localhost:6379');
+			createRedisStore(TEST_URL);
 			eventHandlers['error']('string error');
 			expect(errorSpy).toHaveBeenCalledWith('Redis error: string error', undefined);
 		});
 
-		it('should warn on close event', () => {
-			createRedisStore('redis://localhost:6379');
-			eventHandlers['close']();
-			expect(warnSpy).toHaveBeenCalledWith('Redis connection closed');
-		});
-
-		it('should warn on reconnecting event', () => {
-			createRedisStore('redis://localhost:6379');
-			eventHandlers['reconnecting']();
-			expect(warnSpy).toHaveBeenCalledWith('Redis reconnecting...');
-		});
-
-		it('should mask credentials in the logged URL (user:pass format)', () => {
-			createRedisStore('redis://user:secret@redis-host:6379');
+		it.each([
+			['user:pass format', 'redis://user:secret@redis-host:6379', 'redis://*****@redis-host:6379'],
+			['password-only format', 'redis://:mysecret@redis-host:6379', 'redis://*****@redis-host:6379'],
+		])('should mask credentials in the logged URL (%s)', (_label, url, maskedUrl) => {
+			createRedisStore(url);
 			eventHandlers['connect']();
-			expect(logSpy).toHaveBeenCalledWith('Redis connected (redis://*****@redis-host:6379)');
-		});
-
-		it('should mask credentials in the logged URL (password-only format)', () => {
-			createRedisStore('redis://:mysecret@redis-host:6379');
-			eventHandlers['connect']();
-			expect(logSpy).toHaveBeenCalledWith('Redis connected (redis://*****@redis-host:6379)');
+			expect(logSpy).toHaveBeenCalledWith(`Redis connected (${maskedUrl})`);
 		});
 	});
 
 	describe('cacheModuleOptionsFactory', () => {
-		it('should return CacheOptions with default host and port', () => {
-			const configService = {
-				get: jest.fn((key: string, fallback: any) => fallback),
+		function buildConfigService(overrides: Record<string, any> = {}): ConfigService {
+			return {
+				get: jest.fn((key: string, fallback: any) => (key in overrides ? overrides[key] : fallback)),
 			} as unknown as ConfigService;
+		}
 
-			const result = cacheModuleOptionsFactory(configService);
+		it('should return CacheOptions with default host and port', () => {
+			const result = cacheModuleOptionsFactory(buildConfigService());
 
 			expect(result.ttl).toBe(900);
 			expect(result.max).toBe(1000);
@@ -113,64 +101,30 @@ describe('Cache Module', () => {
 			expect(KeyvRedis).toHaveBeenCalledWith('redis://redis:6379/0');
 		});
 
-		it('should use configured host and port from ConfigService', () => {
-			const configService = {
-				get: jest.fn((key: string, fallback: any) => {
-					if (key === 'REDIS_HOST') return 'custom-host';
-					if (key === 'REDIS_PORT') return 6380;
-					return fallback;
-				}),
-			} as unknown as ConfigService;
-
-			cacheModuleOptionsFactory(configService);
-
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://custom-host:6380/0');
-		});
-
-		it('should include password in URL when REDIS_PASSWORD is set', () => {
-			const configService = {
-				get: jest.fn((key: string, fallback?: any) => {
-					if (key === 'REDIS_PASSWORD') return 's3cret';
-					if (key === 'REDIS_HOST') return 'redis';
-					if (key === 'REDIS_PORT') return 6379;
-					return fallback;
-				}),
-			} as unknown as ConfigService;
-
-			cacheModuleOptionsFactory(configService);
-
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379/0');
-		});
-
-		it('should encode reserved characters in REDIS_PASSWORD', () => {
-			const configService = {
-				get: jest.fn((key: string, fallback?: any) => {
-					if (key === 'REDIS_PASSWORD') return 'p@ss:w/rd#1?';
-					if (key === 'REDIS_HOST') return 'redis';
-					if (key === 'REDIS_PORT') return 6379;
-					return fallback;
-				}),
-			} as unknown as ConfigService;
-
-			cacheModuleOptionsFactory(configService);
-
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0');
-		});
-
-		it('should include REDIS_DB in URL when set to non-default value', () => {
-			const configService = {
-				get: jest.fn((key: string, fallback?: any) => {
-					if (key === 'REDIS_PASSWORD') return 's3cret';
-					if (key === 'REDIS_HOST') return 'redis';
-					if (key === 'REDIS_PORT') return 6379;
-					if (key === 'REDIS_DB') return 2;
-					return fallback;
-				}),
-			} as unknown as ConfigService;
-
-			cacheModuleOptionsFactory(configService);
-
-			expect(KeyvRedis).toHaveBeenCalledWith('redis://:s3cret@redis:6379/2');
+		it.each([
+			[
+				'configured host and port',
+				{ REDIS_HOST: 'custom-host', REDIS_PORT: 6380 },
+				'redis://custom-host:6380/0',
+			],
+			[
+				'password in URL',
+				{ REDIS_PASSWORD: 's3cret', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
+				'redis://:s3cret@redis:6379/0',
+			],
+			[
+				'reserved characters in password',
+				{ REDIS_PASSWORD: 'p@ss:w/rd#1?', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
+				'redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0',
+			],
+			[
+				'non-default REDIS_DB',
+				{ REDIS_PASSWORD: 's3cret', REDIS_HOST: 'redis', REDIS_PORT: 6379, REDIS_DB: 2 },
+				'redis://:s3cret@redis:6379/2',
+			],
+		])('should use %s', (_label, overrides, expectedUrl) => {
+			cacheModuleOptionsFactory(buildConfigService(overrides));
+			expect(KeyvRedis).toHaveBeenCalledWith(expectedUrl);
 		});
 	});
 });
