@@ -15,7 +15,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from '../health/health.module';
 import { AuthModule } from '../auth/auth.module';
 import { CacheShutdownService } from './cache-shutdown.service';
-import { ScheduledMessagesModule } from '../scheduled-messages/scheduled-messages.module';
 
 // Environment variables
 const configModuleOptions: ConfigModuleOptions = {
@@ -102,7 +101,6 @@ const throttlerGuardProvider: Provider = {
 		DatabaseModule,
 		MonitoringModule,
 		SchedulerModule,
-		ScheduledMessagesModule,
 		QueuesModule,
 	],
 	providers: [throttlerGuardProvider, CacheShutdownService],

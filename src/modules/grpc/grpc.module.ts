@@ -19,7 +19,7 @@ import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
 					options: {
 						package: 'whispr.messaging',
 						protoPath: join(__dirname, 'proto/messaging.proto'),
-						url: `${configService.get('MESSAGING_SERVICE_HOST', 'localhost')}:${configService.get('MESSAGING_SERVICE_PORT', '40010')}`,
+						url: `${configService.get('MESSAGING_SERVICE_HOST', 'localhost')}:${configService.get('MESSAGING_SERVICE_PORT', '4001')}`,
 						loader: {
 							keepCase: true,
 							longs: String,
