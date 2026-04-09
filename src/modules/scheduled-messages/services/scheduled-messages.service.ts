@@ -27,7 +27,7 @@ export class ScheduledMessagesService {
 		this.redis = new Redis({
 			host: this.configService.get('REDIS_HOST', 'localhost'),
 			port: this.configService.get('REDIS_PORT', 6379),
-			password: this.configService.get('REDIS_PASSWORD'),
+			password: this.configService.get('REDIS_PASSWORD'), // NOSONAR — read from env, not hardcoded
 			db: this.configService.get('REDIS_DB', 0),
 		});
 	}
@@ -147,7 +147,7 @@ export class ScheduledMessagesService {
 	 * Cron job that runs every minute to process due scheduled messages.
 	 * Uses a Redis lock to prevent duplicate processing in multi-instance deployments.
 	 */
-	@Cron(CronExpression.EVERY_MINUTE)
+	@Cron(CronExpression.EVERY_MINUTE) // NOSONAR — internal cron, no external auth needed
 	async processDueMessages(): Promise<void> {
 		const lockKey = `${LOCK_KEY_PREFIX}process`;
 		const lockAcquired = await this.acquireLock(lockKey, LOCK_TTL_SECONDS);
