@@ -22,7 +22,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @ApiTags('Monitoring')
-@Controller('api/monitoring')
+@Controller('api/v1/monitoring')
 @UseInterceptors(LoggingInterceptor)
 export class MonitoringController {
 	private redis: Redis;
@@ -36,10 +36,10 @@ export class MonitoringController {
 		private readonly configService: ConfigService
 	) {
 		this.redis = new Redis({
-			host: this.configService.get<string>('REDIS_HOST') || 'localhost',
-			port: this.configService.get<number>('REDIS_PORT') || 6379,
-			password: this.configService.get<string>('REDIS_PASSWORD'),
-			db: this.configService.get<number>('REDIS_DB') || 0,
+			host: this.configService.get<string>('redis.host') || 'localhost',
+			port: this.configService.get<number>('redis.port') || 6379,
+			password: this.configService.get<string>('redis.password'),
+			db: this.configService.get<number>('redis.db') || 0,
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,

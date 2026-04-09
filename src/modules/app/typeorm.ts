@@ -7,21 +7,11 @@ import { JobCategory } from '../scheduler/entities/job-category.entity';
 import { ExecutionLog } from '../scheduler/entities/execution-log.entity';
 import { RecurringJob } from '../scheduler/entities/recurring-job.entity';
 import { JobDependency } from '../scheduler/entities/job-dependency.entity';
-import { ScheduledMessage } from '../scheduled-messages/entities/scheduled-message.entity';
 import { DataSourceOptions } from 'typeorm';
 import { InitialSchema1743070800000 } from './migrations/1743070800000-InitialSchema';
 
 // Register new TypeORM entities here
-const ENTITIES = [
-	Job,
-	Schedule,
-	Execution,
-	JobCategory,
-	ExecutionLog,
-	RecurringJob,
-	JobDependency,
-	ScheduledMessage,
-];
+const ENTITIES = [Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency];
 
 const DEFAULT_POSTGRES_PORT = 5432;
 
