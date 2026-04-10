@@ -58,13 +58,13 @@ async function bootstrap() {
 			.build();
 
 		const document = SwaggerModule.createDocument(app, config);
-		SwaggerModule.setup('/api/docs', app, document, {
+		SwaggerModule.setup('swagger', app, document, {
 			swaggerOptions: {
 				persistAuthorization: true,
 			},
 		});
 
-		logger.log(`Swagger documentation available at /api/docs`);
+		logger.log(`Swagger documentation available at /swagger`);
 	}
 
 	// Resolve .proto path for both dev (src) and prod (dist)
@@ -111,7 +111,7 @@ async function bootstrap() {
 	logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
 	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
-		logger.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
+		logger.log(`📚 API Documentation available at http://localhost:${port}/swagger`);
 	}
 
 	// Graceful shutdown logging (enableShutdownHooks handles SIGTERM/SIGINT → app.close())
