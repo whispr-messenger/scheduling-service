@@ -121,7 +121,7 @@ jobs:
         with:
           repository: whispr-messenger/infrastructure
           path: infrastructure
-          ref: main
+          ref: ${{ github.event.workflow_run.head_branch || 'main' }}
           token: ${{ steps.generate_token.outputs.token }}
           fetch-depth: 0
 
@@ -191,11 +191,12 @@ jobs:
           git commit -m "${COMMIT_MSG}"
 
           # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
+          INFRA_BRANCH="${{ github.event.workflow_run.head_branch || 'main' }}"
           MAX_RETRIES=3
           for attempt in $(seq 1 "$MAX_RETRIES"); do
             echo "Attempt ${attempt}/${MAX_RETRIES}: pulling with rebase and pushing changes..."
 
-            if ! git pull origin main --rebase; then
+            if ! git pull origin "${INFRA_BRANCH}" --rebase; then
               echo "⚠️ Rebase failed, resetting and retrying..."
               git rebase --abort 2>/dev/null || true
               git reset --soft HEAD~1
@@ -204,7 +205,7 @@ jobs:
               continue
             fi
 
-            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git main; then
+            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git HEAD:"${INFRA_BRANCH}"; then
               echo "✅ Push successful on attempt ${attempt}"
               exit 0
             fi
