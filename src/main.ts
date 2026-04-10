@@ -53,6 +53,7 @@ async function bootstrap() {
 			.setDescription('Task scheduling and orchestration service')
 			.setVersion('1.0.0')
 			.addBearerAuth()
+			.addServer('/', 'Current host')
 			.addTag('Scheduler', 'Job scheduling and execution')
 			.addTag('Monitoring', 'Health checks and metrics')
 			.build();
