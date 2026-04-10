@@ -22,7 +22,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @ApiTags('Monitoring')
-@Controller('api/monitoring')
+@Controller('api/v1/monitoring')
 @UseInterceptors(LoggingInterceptor)
 export class MonitoringController {
 	private redis: Redis;
