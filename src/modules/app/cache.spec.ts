@@ -114,8 +114,8 @@ describe('Cache Module', () => {
 			],
 			[
 				'reserved characters in password',
-				{ REDIS_PASSWORD: 'p@ss:w/rd#1?', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
-				'redis://:p%40ss%3Aw%2Frd%231%3F@redis:6379/0',
+				{ REDIS_PASSWORD: 'f@ke:t/st#1!', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
+				'redis://:f%40ke%3At%2Fst%231!@redis:6379/0',
 			],
 			[
 				'non-default REDIS_DB',
