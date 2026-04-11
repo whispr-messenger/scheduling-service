@@ -20,6 +20,7 @@ import { DataSource } from 'typeorm';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { buildRedisConnection } from '@/modules/app/redis-connection';
 
 @ApiTags('Monitoring')
 @Controller('api/v1/monitoring')
@@ -36,10 +37,7 @@ export class MonitoringController {
 		private readonly configService: ConfigService
 	) {
 		this.redis = new Redis({
-			host: this.configService.get<string>('redis.host') || 'localhost',
-			port: this.configService.get<number>('redis.port') || 6379,
-			password: this.configService.get<string>('redis.password'),
-			db: this.configService.get<number>('redis.db') || 0,
+			...buildRedisConnection(this.configService),
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,

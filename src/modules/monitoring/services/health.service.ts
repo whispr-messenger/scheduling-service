@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { QueueService } from '@/modules/queues/services/queue.service';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { buildRedisConnection } from '@/modules/app/redis-connection';
 
 @Injectable()
 export class CustomHealthService extends HealthIndicator {
@@ -20,10 +21,7 @@ export class CustomHealthService extends HealthIndicator {
 	) {
 		super();
 		this.redis = new Redis({
-			host: this.configService.get<string>('redis.host') || 'localhost',
-			port: this.configService.get<number>('redis.port') || 6379,
-			password: this.configService.get<string>('redis.password'),
-			db: this.configService.get<number>('redis.db') || 0,
+			...buildRedisConnection(this.configService),
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,

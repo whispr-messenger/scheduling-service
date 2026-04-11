@@ -1,15 +1,24 @@
-import { CacheOptions } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import KeyvRedis, { createClient, createSentinel } from '@keyv/redis';
-import { parseSentinels } from './redis-connection';
+import { RedisOptions } from 'ioredis';
 
-export function cacheModuleOptionsFactory(configService: ConfigService): CacheOptions {
+export function parseSentinels(sentinelsStr: string): Array<{ host: string; port: number }> {
+	return sentinelsStr
+		.split(',')
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0)
+		.map((s) => {
+			const [host, port] = s.split(':');
+			return { host, port: Number.parseInt(port, 10) };
+		});
+}
+
+export function buildRedisConnection(configService: ConfigService): RedisOptions {
 	const mode = configService.get<string>('REDIS_MODE', 'direct');
 	const db = Number.parseInt(configService.get<string>('REDIS_DB', '0'), 10);
 	const username = configService.get<string>('REDIS_USERNAME') || undefined;
 	const password = configService.get<string>('REDIS_PASSWORD') || undefined;
 
-	let client: ReturnType<typeof createClient> | ReturnType<typeof createSentinel>;
+	const reconnectOnError = (err: Error) => err.message.includes('NOAUTH');
 
 	if (mode === 'sentinel') {
 		const sentinelsStr = configService.get<string>('REDIS_SENTINELS');
@@ -26,26 +35,26 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 			throw new Error('REDIS_SENTINEL_PASSWORD is required when REDIS_MODE=sentinel');
 		}
 
-		client = createSentinel({
+		return {
+			sentinels: parseSentinels(sentinelsStr),
 			name: masterName,
-			sentinelRootNodes: parseSentinels(sentinelsStr),
-			nodeClientOptions: { username, password, database: db },
-			sentinelClientOptions: { password: sentinelPassword },
-		});
-	} else {
-		const host = configService.get<string>('REDIS_HOST', 'redis');
-		const port = Number.parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
-		client = createClient({
-			socket: { host, port },
+			db,
 			username,
 			password,
-			database: db,
-		});
+			sentinelPassword,
+			reconnectOnError,
+		};
 	}
 
+	const host = configService.get<string>('REDIS_HOST', 'localhost');
+	const port = Number.parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
+
 	return {
-		stores: [new KeyvRedis(client)],
-		ttl: 900,
-		max: 1000,
+		host,
+		port,
+		db,
+		username,
+		password,
+		reconnectOnError,
 	};
 }

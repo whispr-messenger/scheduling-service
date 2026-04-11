@@ -11,6 +11,7 @@ import { QueuesModule } from '../queues/queues.module';
 import { DatabaseModule } from '../database/database.module';
 import { typeOrmModuleOptionsFactory } from './typeorm';
 import { cacheModuleOptionsFactory } from './cache';
+import { buildRedisConnection } from './redis-connection';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from '../health/health.module';
 import { AuthModule } from '../auth/auth.module';
@@ -41,12 +42,7 @@ const cacheModuleAsyncOptions: CacheModuleAsyncOptions = {
 const bullModuleAsyncOptions = {
 	imports: [ConfigModule],
 	useFactory: (configService: ConfigService) => ({
-		connection: {
-			host: configService.get('REDIS_HOST', 'localhost'),
-			port: configService.get('REDIS_PORT', 6379),
-			password: configService.get('REDIS_PASSWORD'),
-			db: configService.get('REDIS_DB', 0),
-		},
+		connection: buildRedisConnection(configService),
 		defaultJobOptions: {
 			removeOnComplete: 50,
 			removeOnFail: 100,
