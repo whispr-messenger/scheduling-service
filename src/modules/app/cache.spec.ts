@@ -76,8 +76,8 @@ describe('Cache Module', () => {
 		});
 
 		it.each([
-			['user:pass format', 'redis://user:secret@redis-host:6379', 'redis://*****@redis-host:6379'],
-			['password-only format', 'redis://:mysecret@redis-host:6379', 'redis://*****@redis-host:6379'],
+			['user:pass format', 'redis://user:not-a-secret@redis-host:6379', 'redis://*****@redis-host:6379'],
+			['password-only format', 'redis://:not-a-secret@redis-host:6379', 'redis://*****@redis-host:6379'],
 		])('should mask credentials in the logged URL (%s)', (_label, url, maskedUrl) => {
 			createRedisStore(url);
 			eventHandlers['connect']();
@@ -109,8 +109,8 @@ describe('Cache Module', () => {
 			],
 			[
 				'password in URL',
-				{ REDIS_PASSWORD: 's3cret', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
-				'redis://:s3cret@redis:6379/0',
+				{ REDIS_PASSWORD: 'not-a-secret', REDIS_HOST: 'redis', REDIS_PORT: 6379 },
+				'redis://:not-a-secret@redis:6379/0',
 			],
 			[
 				'reserved characters in password',
@@ -119,8 +119,8 @@ describe('Cache Module', () => {
 			],
 			[
 				'non-default REDIS_DB',
-				{ REDIS_PASSWORD: 's3cret', REDIS_HOST: 'redis', REDIS_PORT: 6379, REDIS_DB: 2 },
-				'redis://:s3cret@redis:6379/2',
+				{ REDIS_PASSWORD: 'not-a-secret', REDIS_HOST: 'redis', REDIS_PORT: 6379, REDIS_DB: 2 },
+				'redis://:not-a-secret@redis:6379/2',
 			],
 		])('should use %s', (_label, overrides, expectedUrl) => {
 			cacheModuleOptionsFactory(buildConfigService(overrides));
