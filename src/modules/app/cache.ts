@@ -23,9 +23,16 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 			throw new Error('REDIS_SENTINEL_PASSWORD is required when REDIS_MODE=sentinel');
 		}
 
+		const sentinelRootNodes = parseSentinels(sentinelsStr);
+		if (sentinelRootNodes.length === 0) {
+			throw new Error(
+				'REDIS_SENTINELS must include at least one host:port entry when REDIS_MODE=sentinel'
+			);
+		}
+
 		client = createSentinel({
 			name: masterName,
-			sentinelRootNodes: parseSentinels(sentinelsStr),
+			sentinelRootNodes,
 			nodeClientOptions: { username, password, database: db },
 			sentinelClientOptions: { password: sentinelPassword },
 		});

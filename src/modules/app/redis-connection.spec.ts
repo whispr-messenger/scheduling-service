@@ -39,7 +39,19 @@ describe('parseSentinels', () => {
 	});
 
 	it('throws on entry with non-numeric port', () => {
-		expect(() => parseSentinels('host:abc')).toThrow('port must be a finite integer');
+		expect(() => parseSentinels('host:abc')).toThrow('port must be an integer between 1 and 65535');
+	});
+
+	it('rejects partially-numeric port', () => {
+		expect(() => parseSentinels('host:26379abc')).toThrow('port must be an integer between 1 and 65535');
+	});
+
+	it('rejects out-of-range port', () => {
+		expect(() => parseSentinels('host:70000')).toThrow('port must be an integer between 1 and 65535');
+	});
+
+	it('rejects port 0', () => {
+		expect(() => parseSentinels('host:0')).toThrow('port must be an integer between 1 and 65535');
 	});
 });
 
@@ -162,6 +174,13 @@ describe('buildRedisConnection', () => {
 		])('throws when %s is missing', (missingKey, expectedMessage) => {
 			const env = { ...baseEnv, [missingKey]: undefined };
 			expect(() => buildRedisConnection(makeConfigService(env))).toThrow(expectedMessage);
+		});
+
+		it('throws when REDIS_SENTINELS parses to an empty list', () => {
+			const env = { ...baseEnv, REDIS_SENTINELS: ',,' };
+			expect(() => buildRedisConnection(makeConfigService(env))).toThrow(
+				'REDIS_SENTINELS must include at least one host:port entry'
+			);
 		});
 	});
 });

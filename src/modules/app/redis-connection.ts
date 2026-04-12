@@ -16,9 +16,11 @@ export function parseSentinels(sentinelsStr: string): Array<{ host: string; port
 			if (host.length === 0) {
 				throw new Error(`Invalid REDIS_SENTINELS entry "${s}": host must be non-empty`);
 			}
-			const port = Number.parseInt(portStr, 10);
-			if (!Number.isFinite(port)) {
-				throw new Error(`Invalid REDIS_SENTINELS entry "${s}": port must be a finite integer`);
+			const port = Number(portStr);
+			if (!Number.isInteger(port) || port < 1 || port > 65535) {
+				throw new Error(
+					`Invalid REDIS_SENTINELS entry "${s}": port must be an integer between 1 and 65535`
+				);
 			}
 			return { host, port };
 		});
@@ -65,8 +67,15 @@ export function buildRedisConnection(configService: ConfigService): RedisOptions
 			throw new Error('REDIS_SENTINEL_PASSWORD is required when REDIS_MODE=sentinel');
 		}
 
+		const sentinels = parseSentinels(sentinelsStr);
+		if (sentinels.length === 0) {
+			throw new Error(
+				'REDIS_SENTINELS must include at least one host:port entry when REDIS_MODE=sentinel'
+			);
+		}
+
 		return {
-			sentinels: parseSentinels(sentinelsStr),
+			sentinels,
 			name: masterName,
 			db,
 			username,
