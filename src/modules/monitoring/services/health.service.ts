@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { HealthCheckService, HealthCheck, HealthIndicatorResult, HealthIndicator } from '@nestjs/terminus';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -8,7 +8,7 @@ import Redis from 'ioredis';
 import { buildRedisConnection } from '@/modules/app/redis-connection';
 
 @Injectable()
-export class CustomHealthService extends HealthIndicator {
+export class CustomHealthService extends HealthIndicator implements OnModuleDestroy {
 	private readonly logger = new Logger(CustomHealthService.name);
 	private redis: Redis;
 
@@ -20,12 +20,17 @@ export class CustomHealthService extends HealthIndicator {
 		private configService: ConfigService
 	) {
 		super();
+		const { reconnectOnError: _, ...connOpts } = buildRedisConnection(this.configService);
 		this.redis = new Redis({
-			...buildRedisConnection(this.configService),
+			...connOpts,
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,
 		});
+	}
+
+	async onModuleDestroy() {
+		await this.redis.quit().catch(() => this.redis.disconnect());
 	}
 
 	@HealthCheck()

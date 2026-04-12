@@ -9,6 +9,7 @@ import {
 	UseInterceptors,
 	ParseUUIDPipe,
 	ServiceUnavailableException,
+	OnModuleDestroy,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckResult } from '@nestjs/terminus';
@@ -25,7 +26,7 @@ import { buildRedisConnection } from '@/modules/app/redis-connection';
 @ApiTags('Monitoring')
 @Controller('api/v1/monitoring')
 @UseInterceptors(LoggingInterceptor)
-export class MonitoringController {
+export class MonitoringController implements OnModuleDestroy {
 	private redis: Redis;
 
 	constructor(
@@ -36,12 +37,17 @@ export class MonitoringController {
 		private readonly dataSource: DataSource,
 		private readonly configService: ConfigService
 	) {
+		const { reconnectOnError: _, ...connOpts } = buildRedisConnection(this.configService);
 		this.redis = new Redis({
-			...buildRedisConnection(this.configService),
+			...connOpts,
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,
 		});
+	}
+
+	async onModuleDestroy() {
+		await this.redis.quit().catch(() => this.redis.disconnect());
 	}
 
 	@Get('health')

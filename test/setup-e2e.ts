@@ -19,7 +19,7 @@ beforeAll(async () => {
 	// Redis
 	process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 	process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
-	process.env.REDIS_PASSWORD = process.env.REDIS_PASSWORD || 'whispr_dev_password'; // NOSONAR - test environment default, not a real credential
+	process.env.REDIS_PASSWORD = process.env.REDIS_PASSWORD || '';
 	process.env.REDIS_DB = process.env.REDIS_DB || '4';
 });
 
