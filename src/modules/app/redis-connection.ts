@@ -24,7 +24,12 @@ export function parseSentinels(sentinelsStr: string): Array<{ host: string; port
 		});
 }
 
-export function buildRedisConnection(configService: ConfigService): RedisOptions {
+export function parseBaseRedisEnv(configService: ConfigService): {
+	mode: 'direct' | 'sentinel';
+	db: number;
+	username: string | undefined;
+	password: string | undefined;
+} {
 	const mode = configService.get<string>('REDIS_MODE', 'direct');
 	if (mode !== 'direct' && mode !== 'sentinel') {
 		throw new Error(`Unsupported REDIS_MODE "${mode}": must be "direct" or "sentinel"`);
@@ -36,6 +41,11 @@ export function buildRedisConnection(configService: ConfigService): RedisOptions
 	}
 	const username = configService.get<string>('REDIS_USERNAME') || undefined;
 	const password = configService.get<string>('REDIS_PASSWORD') || undefined;
+	return { mode, db, username, password };
+}
+
+export function buildRedisConnection(configService: ConfigService): RedisOptions {
+	const { mode, db, username, password } = parseBaseRedisEnv(configService);
 
 	const reconnectOnError = (err: Error) =>
 		err.message.includes('NOAUTH') || err.message.includes('WRONGPASS');

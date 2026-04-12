@@ -1,20 +1,10 @@
 import { CacheOptions } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import KeyvRedis, { createClient, createSentinel } from '@keyv/redis';
-import { parseSentinels } from './redis-connection';
+import { parseBaseRedisEnv, parseSentinels } from './redis-connection';
 
 export function cacheModuleOptionsFactory(configService: ConfigService): CacheOptions {
-	const mode = configService.get<string>('REDIS_MODE', 'direct');
-	if (mode !== 'direct' && mode !== 'sentinel') {
-		throw new Error(`Unsupported REDIS_MODE "${mode}": must be "direct" or "sentinel"`);
-	}
-	const dbStr = configService.get<string>('REDIS_DB', '0');
-	const db = Number(dbStr);
-	if (!Number.isInteger(db) || db < 0) {
-		throw new Error(`Invalid REDIS_DB "${dbStr}": must be a non-negative integer`);
-	}
-	const username = configService.get<string>('REDIS_USERNAME') || undefined;
-	const password = configService.get<string>('REDIS_PASSWORD') || undefined;
+	const { mode, db, username, password } = parseBaseRedisEnv(configService);
 
 	let client: ReturnType<typeof createClient> | ReturnType<typeof createSentinel>;
 

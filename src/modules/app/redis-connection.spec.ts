@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { buildRedisConnection, parseSentinels } from './redis-connection';
+import { buildRedisConnection, parseBaseRedisEnv, parseSentinels } from './redis-connection';
 
 function makeConfigService(env: Record<string, string | undefined>): ConfigService {
 	return {
@@ -43,6 +43,39 @@ describe('parseSentinels', () => {
 	});
 });
 
+describe('parseBaseRedisEnv', () => {
+	it('returns defaults when env vars are missing', () => {
+		const result = parseBaseRedisEnv(makeConfigService({}));
+		expect(result).toEqual({ mode: 'direct', db: 0, username: undefined, password: undefined });
+	});
+
+	it('parses all base env vars', () => {
+		const result = parseBaseRedisEnv(
+			makeConfigService({
+				REDIS_MODE: 'sentinel',
+				REDIS_DB: '5',
+				REDIS_USERNAME: 'alice',
+				REDIS_PASSWORD: 'fake-password',
+			})
+		);
+		expect(result).toEqual({ mode: 'sentinel', db: 5, username: 'alice', password: 'fake-password' });
+	});
+
+	it('throws for unsupported REDIS_MODE', () => {
+		expect(() => parseBaseRedisEnv(makeConfigService({ REDIS_MODE: 'cluster' }))).toThrow(
+			'Unsupported REDIS_MODE "cluster"'
+		);
+	});
+
+	it('throws for non-numeric REDIS_DB', () => {
+		expect(() => parseBaseRedisEnv(makeConfigService({ REDIS_DB: 'abc' }))).toThrow('Invalid REDIS_DB');
+	});
+
+	it('throws for partially-numeric REDIS_DB', () => {
+		expect(() => parseBaseRedisEnv(makeConfigService({ REDIS_DB: '0abc' }))).toThrow('Invalid REDIS_DB');
+	});
+});
+
 describe('buildRedisConnection', () => {
 	describe('direct mode', () => {
 		it('builds host+port options from env', () => {
@@ -79,24 +112,6 @@ describe('buildRedisConnection', () => {
 			expect(opts.reconnectOnError!(new Error('NOAUTH Authentication required.'))).toBe(true);
 			expect(opts.reconnectOnError!(new Error('WRONGPASS invalid username-password pair'))).toBe(true);
 			expect(opts.reconnectOnError!(new Error('ECONNRESET'))).toBe(false);
-		});
-
-		it('throws for unsupported REDIS_MODE', () => {
-			expect(() => buildRedisConnection(makeConfigService({ REDIS_MODE: 'cluster' }))).toThrow(
-				'Unsupported REDIS_MODE "cluster"'
-			);
-		});
-
-		it('throws for non-numeric REDIS_DB', () => {
-			expect(() => buildRedisConnection(makeConfigService({ REDIS_DB: 'abc' }))).toThrow(
-				'Invalid REDIS_DB'
-			);
-		});
-
-		it('throws for partially-numeric REDIS_DB', () => {
-			expect(() => buildRedisConnection(makeConfigService({ REDIS_DB: '0abc' }))).toThrow(
-				'Invalid REDIS_DB'
-			);
 		});
 
 		it('throws for non-numeric REDIS_PORT', () => {
