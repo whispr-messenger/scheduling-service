@@ -116,24 +116,51 @@ jobs:
           fi
           echo "✅ Image found in registry"
 
+      - name: Determine trigger branch
+        id: branch
+        run: |
+          TRIGGER_BRANCH="${{ github.event.workflow_run.head_branch || 'main' }}"
+          echo "trigger_branch=${TRIGGER_BRANCH}" >> $GITHUB_OUTPUT
+          if [ "$TRIGGER_BRANCH" = "main" ]; then
+            echo "infra_branch=main" >> $GITHUB_OUTPUT
+          else
+            echo "infra_branch=deploy/preprod" >> $GITHUB_OUTPUT
+          fi
+          echo "Trigger branch: ${TRIGGER_BRANCH}"
+
       - name: Checkout infrastructure repository
         uses: actions/checkout@v4
         with:
           repository: whispr-messenger/infrastructure
           path: infrastructure
-          ref: main
+          ref: ${{ steps.branch.outputs.infra_branch }}
           token: ${{ steps.generate_token.outputs.token }}
           fetch-depth: 0
 
-      - name: Validate deployment manifest path
+      - name: Validate deployment manifest paths
         run: |
-          MANIFEST_PATH="infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
-          if [ ! -f "$MANIFEST_PATH" ]; then
-            echo "❌ Error: Deployment manifest not found at $MANIFEST_PATH"
-            echo "Please verify the path in the infrastructure repository."
-            exit 1
+          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
+
+          if [ "$TRIGGER_BRANCH" = "main" ]; then
+            PATHS=(
+              "infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/production/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          else
+            PATHS=(
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
           fi
-          echo "✅ Deployment manifest found at $MANIFEST_PATH"
+
+          for MANIFEST_PATH in "${PATHS[@]}"; do
+            if [ ! -f "$MANIFEST_PATH" ]; then
+              echo "❌ Error: Deployment manifest not found at $MANIFEST_PATH"
+              echo "Please verify the path in the infrastructure repository."
+              exit 1
+            fi
+            echo "✅ Deployment manifest found at $MANIFEST_PATH"
+          done
 
       - name: Update image tag in deployment
         id: update_image
@@ -156,13 +183,45 @@ jobs:
           echo "Image tag: $IMAGE_TAG"
           echo "Updating deployment image to: ${FULL_IMAGE}"
 
-          # Update the deployment manifest in the infrastructure repository
-          yq -i 'select(.kind == "Deployment").spec.template.spec.containers[0].image = "'"${FULL_IMAGE}"'"' infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml
+          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
+
+          if [ "$TRIGGER_BRANCH" = "main" ]; then
+            MANIFESTS=(
+              "infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/production/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          else
+            MANIFESTS=(
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          fi
+
+          for MANIFEST in "${MANIFESTS[@]}"; do
+            echo "Updating ${MANIFEST}..."
+            yq -i 'select(.kind == "Deployment").spec.template.spec.containers[0].image = "'"${FULL_IMAGE}"'"' "$MANIFEST"
+          done
 
       - name: Verify update
         run: |
-          echo "Updated deployment manifest:"
-          yq '.spec.template.spec.containers[0].image' infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml
+          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
+
+          if [ "$TRIGGER_BRANCH" = "main" ]; then
+            MANIFESTS=(
+              "infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/production/scheduling-service/deployment.yaml"
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          else
+            MANIFESTS=(
+              "infrastructure/k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          fi
+
+          for MANIFEST in "${MANIFESTS[@]}"; do
+            echo "Image in ${MANIFEST}:"
+            yq '.spec.template.spec.containers[0].image' "$MANIFEST"
+          done
 
       - name: Commit and push changes
         working-directory: infrastructure
@@ -170,8 +229,32 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
+          INFRA_BRANCH="${{ steps.branch.outputs.infra_branch }}"
+
+          # Determine which files to add and check
+          if [ "$TRIGGER_BRANCH" = "main" ]; then
+            GIT_FILES=(
+              "k8s/whispr/prod/scheduling-service/deployment.yaml"
+              "k8s/whispr/production/scheduling-service/deployment.yaml"
+              "k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          else
+            GIT_FILES=(
+              "k8s/whispr/preprod/scheduling-service/deployment.yaml"
+            )
+          fi
+
           # Check if there are changes to commit
-          if git diff --quiet k8s/whispr/prod/scheduling-service/deployment.yaml; then
+          HAS_CHANGES=false
+          for f in "${GIT_FILES[@]}"; do
+            if ! git diff --quiet "$f" 2>/dev/null; then
+              HAS_CHANGES=true
+              break
+            fi
+          done
+
+          if [ "$HAS_CHANGES" = "false" ]; then
             echo "No changes to commit"
             exit 0
           fi
@@ -187,7 +270,9 @@ jobs:
             COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA}"
           fi
 
-          git add k8s/whispr/prod/scheduling-service/deployment.yaml
+          for f in "${GIT_FILES[@]}"; do
+            git add "$f"
+          done
           git commit -m "${COMMIT_MSG}"
 
           # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
@@ -195,7 +280,7 @@ jobs:
           for attempt in $(seq 1 "$MAX_RETRIES"); do
             echo "Attempt ${attempt}/${MAX_RETRIES}: pulling with rebase and pushing changes..."
 
-            if ! git pull origin main --rebase; then
+            if ! git pull origin "${INFRA_BRANCH}" --rebase; then
               echo "⚠️ Rebase failed, resetting and retrying..."
               git rebase --abort 2>/dev/null || true
               git reset --soft HEAD~1
@@ -204,7 +289,7 @@ jobs:
               continue
             fi
 
-            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git main; then
+            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git HEAD:"${INFRA_BRANCH}"; then
               echo "✅ Push successful on attempt ${attempt}"
               exit 0
             fi
