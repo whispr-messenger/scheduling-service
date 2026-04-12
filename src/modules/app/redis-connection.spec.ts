@@ -29,6 +29,18 @@ describe('parseSentinels', () => {
 			{ host: 'b', port: 2 },
 		]);
 	});
+
+	it('throws on entry missing port', () => {
+		expect(() => parseSentinels('host-only')).toThrow('expected format host:port');
+	});
+
+	it('throws on entry with empty host', () => {
+		expect(() => parseSentinels(':6379')).toThrow('host must be non-empty');
+	});
+
+	it('throws on entry with non-numeric port', () => {
+		expect(() => parseSentinels('host:abc')).toThrow('port must be a finite integer');
+	});
 });
 
 describe('buildRedisConnection', () => {
@@ -61,11 +73,30 @@ describe('buildRedisConnection', () => {
 			expect(opts.password).toBeUndefined();
 		});
 
-		it('sets a reconnectOnError that matches NOAUTH errors', () => {
+		it('sets a reconnectOnError that matches NOAUTH and WRONGPASS errors', () => {
 			const opts = buildRedisConnection(makeConfigService({}));
 			expect(typeof opts.reconnectOnError).toBe('function');
 			expect(opts.reconnectOnError!(new Error('NOAUTH Authentication required.'))).toBe(true);
+			expect(opts.reconnectOnError!(new Error('WRONGPASS invalid username-password pair'))).toBe(true);
 			expect(opts.reconnectOnError!(new Error('ECONNRESET'))).toBe(false);
+		});
+
+		it('throws for unsupported REDIS_MODE', () => {
+			expect(() => buildRedisConnection(makeConfigService({ REDIS_MODE: 'cluster' }))).toThrow(
+				'Unsupported REDIS_MODE "cluster"'
+			);
+		});
+
+		it('throws for non-numeric REDIS_DB', () => {
+			expect(() => buildRedisConnection(makeConfigService({ REDIS_DB: 'abc' }))).toThrow(
+				'Invalid REDIS_DB'
+			);
+		});
+
+		it('throws for non-numeric REDIS_PORT', () => {
+			expect(() => buildRedisConnection(makeConfigService({ REDIS_PORT: 'abc' }))).toThrow(
+				'Invalid REDIS_PORT'
+			);
 		});
 	});
 

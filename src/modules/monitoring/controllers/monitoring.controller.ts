@@ -37,9 +37,8 @@ export class MonitoringController implements OnModuleDestroy {
 		private readonly dataSource: DataSource,
 		private readonly configService: ConfigService
 	) {
-		const { reconnectOnError: _, ...connOpts } = buildRedisConnection(this.configService);
 		this.redis = new Redis({
-			...connOpts,
+			...buildRedisConnection(this.configService),
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,

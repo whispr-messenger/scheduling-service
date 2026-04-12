@@ -7,18 +7,37 @@ export function parseSentinels(sentinelsStr: string): Array<{ host: string; port
 		.map((s) => s.trim())
 		.filter((s) => s.length > 0)
 		.map((s) => {
-			const [host, port] = s.split(':');
-			return { host, port: Number.parseInt(port, 10) };
+			const parts = s.split(':');
+			if (parts.length !== 2) {
+				throw new Error(`Invalid REDIS_SENTINELS entry "${s}": expected format host:port`);
+			}
+			const host = parts[0].trim();
+			const portStr = parts[1].trim();
+			if (host.length === 0) {
+				throw new Error(`Invalid REDIS_SENTINELS entry "${s}": host must be non-empty`);
+			}
+			const port = Number.parseInt(portStr, 10);
+			if (!Number.isFinite(port)) {
+				throw new Error(`Invalid REDIS_SENTINELS entry "${s}": port must be a finite integer`);
+			}
+			return { host, port };
 		});
 }
 
 export function buildRedisConnection(configService: ConfigService): RedisOptions {
 	const mode = configService.get<string>('REDIS_MODE', 'direct');
+	if (mode !== 'direct' && mode !== 'sentinel') {
+		throw new Error(`Unsupported REDIS_MODE "${mode}": must be "direct" or "sentinel"`);
+	}
 	const db = Number.parseInt(configService.get<string>('REDIS_DB', '0'), 10);
+	if (!Number.isFinite(db)) {
+		throw new Error(`Invalid REDIS_DB: must be a finite integer`);
+	}
 	const username = configService.get<string>('REDIS_USERNAME') || undefined;
 	const password = configService.get<string>('REDIS_PASSWORD') || undefined;
 
-	const reconnectOnError = (err: Error) => err.message.includes('NOAUTH');
+	const reconnectOnError = (err: Error) =>
+		err.message.includes('NOAUTH') || err.message.includes('WRONGPASS');
 
 	if (mode === 'sentinel') {
 		const sentinelsStr = configService.get<string>('REDIS_SENTINELS');
@@ -48,6 +67,9 @@ export function buildRedisConnection(configService: ConfigService): RedisOptions
 
 	const host = configService.get<string>('REDIS_HOST', 'localhost');
 	const port = Number.parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
+	if (!Number.isFinite(port)) {
+		throw new Error(`Invalid REDIS_PORT: must be a finite integer`);
+	}
 
 	return {
 		host,

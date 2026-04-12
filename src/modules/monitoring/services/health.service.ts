@@ -20,9 +20,8 @@ export class CustomHealthService extends HealthIndicator implements OnModuleDest
 		private configService: ConfigService
 	) {
 		super();
-		const { reconnectOnError: _, ...connOpts } = buildRedisConnection(this.configService);
 		this.redis = new Redis({
-			...connOpts,
+			...buildRedisConnection(this.configService),
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 1,
 			lazyConnect: true,
