@@ -1,0 +1,13 @@
+{
+  "repoPath": "/home/debian/whispr-messenger/scheduling-service",
+  "lastCommit": "97288622cd730cda854918f32c58b7b9d253a7b7",
+  "indexedAt": "2026-04-09T13:30:36.887Z",
+  "stats": {
+    "files": 101,
+    "nodes": 1111,
+    "edges": 2220,
+    "communities": 43,
+    "processes": 46,
+    "embeddings": 0
+  }
+}
