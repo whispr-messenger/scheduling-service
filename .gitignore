@@ -128,4 +128,6 @@ testem.log
 /typings
 
 # Prisma
-/prisma/migrations/
+/prisma/migrations/.gitnexus/
+.playwright-mcp/
+AGENTS.md
