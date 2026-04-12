@@ -93,8 +93,20 @@ describe('buildRedisConnection', () => {
 			);
 		});
 
+		it('throws for partially-numeric REDIS_DB', () => {
+			expect(() => buildRedisConnection(makeConfigService({ REDIS_DB: '0abc' }))).toThrow(
+				'Invalid REDIS_DB'
+			);
+		});
+
 		it('throws for non-numeric REDIS_PORT', () => {
 			expect(() => buildRedisConnection(makeConfigService({ REDIS_PORT: 'abc' }))).toThrow(
+				'Invalid REDIS_PORT'
+			);
+		});
+
+		it('throws for out-of-range REDIS_PORT', () => {
+			expect(() => buildRedisConnection(makeConfigService({ REDIS_PORT: '70000' }))).toThrow(
 				'Invalid REDIS_PORT'
 			);
 		});

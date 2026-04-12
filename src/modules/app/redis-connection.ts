@@ -29,9 +29,10 @@ export function buildRedisConnection(configService: ConfigService): RedisOptions
 	if (mode !== 'direct' && mode !== 'sentinel') {
 		throw new Error(`Unsupported REDIS_MODE "${mode}": must be "direct" or "sentinel"`);
 	}
-	const db = Number.parseInt(configService.get<string>('REDIS_DB', '0'), 10);
-	if (!Number.isFinite(db)) {
-		throw new Error(`Invalid REDIS_DB: must be a finite integer`);
+	const dbStr = configService.get<string>('REDIS_DB', '0');
+	const db = Number(dbStr);
+	if (!Number.isInteger(db) || db < 0) {
+		throw new Error(`Invalid REDIS_DB "${dbStr}": must be a non-negative integer`);
 	}
 	const username = configService.get<string>('REDIS_USERNAME') || undefined;
 	const password = configService.get<string>('REDIS_PASSWORD') || undefined;
@@ -66,9 +67,10 @@ export function buildRedisConnection(configService: ConfigService): RedisOptions
 	}
 
 	const host = configService.get<string>('REDIS_HOST', 'localhost');
-	const port = Number.parseInt(configService.get<string>('REDIS_PORT', '6379'), 10);
-	if (!Number.isFinite(port)) {
-		throw new Error(`Invalid REDIS_PORT: must be a finite integer`);
+	const portStr = configService.get<string>('REDIS_PORT', '6379');
+	const port = Number(portStr);
+	if (!Number.isInteger(port) || port < 1 || port > 65535) {
+		throw new Error(`Invalid REDIS_PORT "${portStr}": must be an integer between 1 and 65535`);
 	}
 
 	return {
