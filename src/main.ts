@@ -22,8 +22,15 @@ async function bootstrap() {
 
 	// Enable CORS if configured
 	if (configService.get('CORS_ENABLED', 'true') === 'true') {
+		const rawOrigins = configService.get<string>('CORS_ALLOWED_ORIGINS', '');
+		const allowedOrigins = rawOrigins
+			.split(',')
+			.map((o: string) => o.trim())
+			.filter(Boolean);
 		app.enableCors({
-			origin: configService.get('CORS_ORIGIN', '*'),
+			origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+			methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+			allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Origin', 'X-Requested-With'],
 			credentials: true,
 		});
 	}
@@ -53,18 +60,19 @@ async function bootstrap() {
 			.setDescription('Task scheduling and orchestration service')
 			.setVersion('1.0.0')
 			.addBearerAuth()
+			.addServer('/', 'Current host')
 			.addTag('Scheduler', 'Job scheduling and execution')
 			.addTag('Monitoring', 'Health checks and metrics')
 			.build();
 
 		const document = SwaggerModule.createDocument(app, config);
-		SwaggerModule.setup('/api/docs', app, document, {
+		SwaggerModule.setup('swagger', app, document, {
 			swaggerOptions: {
 				persistAuthorization: true,
 			},
 		});
 
-		logger.log(`Swagger documentation available at /api/docs`);
+		logger.log(`Swagger documentation available at /swagger`);
 	}
 
 	// Resolve .proto path for both dev (src) and prod (dist)
@@ -111,7 +119,7 @@ async function bootstrap() {
 	logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
 	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
-		logger.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
+		logger.log(`📚 API Documentation available at http://localhost:${port}/swagger`);
 	}
 
 	// Graceful shutdown logging (enableShutdownHooks handles SIGTERM/SIGINT → app.close())
