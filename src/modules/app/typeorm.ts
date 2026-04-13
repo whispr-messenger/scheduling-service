@@ -7,11 +7,22 @@ import { JobCategory } from '../scheduler/entities/job-category.entity';
 import { ExecutionLog } from '../scheduler/entities/execution-log.entity';
 import { RecurringJob } from '../scheduler/entities/recurring-job.entity';
 import { JobDependency } from '../scheduler/entities/job-dependency.entity';
+import { ScheduledMessage } from '../scheduled-messages/entities/scheduled-message.entity';
 import { DataSourceOptions } from 'typeorm';
 import { InitialSchema1743070800000 } from './migrations/1743070800000-InitialSchema';
+import { AddScheduledMessages1743070800001 } from './migrations/1743070800001-AddScheduledMessages';
 
 // Register new TypeORM entities here
-const ENTITIES = [Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency];
+const ENTITIES = [
+	Job,
+	Schedule,
+	Execution,
+	JobCategory,
+	ExecutionLog,
+	RecurringJob,
+	JobDependency,
+	ScheduledMessage,
+];
 
 const DEFAULT_POSTGRES_PORT = 5432;
 
@@ -61,7 +72,7 @@ function getDataSourceOptions(configService: ConfigService): DataSourceOptions {
 		logging: configService.get('DB_LOGGING', 'false') === 'true',
 		// Migrations to be loaded and used for this data source
 		// Explicit path (no glob) avoids DirectoryExportedClassesLoader infinite recursion (stack overflow)
-		migrations: [InitialSchema1743070800000],
+		migrations: [InitialSchema1743070800000, AddScheduledMessages1743070800001],
 		// Indicates if migrations should be auto-run on every application launch.
 		migrationsRun: configService.get('DB_MIGRATIONS_RUN', 'false') === 'true',
 		// Indicates if database schema should be auto created on every application launch.

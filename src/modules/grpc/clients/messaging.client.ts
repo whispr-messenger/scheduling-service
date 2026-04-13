@@ -51,7 +51,7 @@ export class MessagingGrpcClient implements OnModuleInit {
 		options: {
 			package: 'whispr.messaging',
 			protoPath: join(__dirname, '../proto/messaging.proto'),
-			url: 'messaging-service:50052', // Kubernetes service name
+			url: 'localhost:40010',
 			loader: {
 				keepCase: true,
 				longs: String,
