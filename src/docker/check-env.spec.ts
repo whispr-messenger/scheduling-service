@@ -39,11 +39,6 @@ describe('Environment Checks', () => {
 		process.env.REDIS_HOST = 'localhost';
 		process.env.REDIS_PORT = '6379';
 		process.env.HTTP_PORT = '3000';
-		process.env.GRPC_PORT = '50051';
-		process.env.MESSAGING_SERVICE_HOST = 'localhost';
-		process.env.MESSAGING_SERVICE_PORT = '50052';
-		process.env.NOTIFICATION_SERVICE_HOST = 'localhost';
-		process.env.NOTIFICATION_SERVICE_PORT = '50053';
 	}
 
 	async function freshRunEnvChecks(): Promise<typeof runEnvChecks> {
@@ -78,7 +73,6 @@ describe('Environment Checks', () => {
 			expect(consoleLogSpy).toHaveBeenCalledWith(
 				expect.stringContaining('One of [PORT, HTTP_PORT] is set')
 			);
-			expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('GRPC_PORT is set'));
 		});
 
 		it('should pass when only PORT is set and HTTP_PORT is missing', async () => {
@@ -176,6 +170,8 @@ describe('Environment Checks', () => {
 			process.env.REDIS_DB = '1';
 			process.env.NODE_OPTIONS = '--max-old-space-size=4096';
 			process.env.HEALTH_CHECK_TIMEOUT = '10000';
+			process.env.MESSAGING_EVENTS_CHANNEL = 'whispr.messaging.events';
+			process.env.NOTIFICATION_EVENTS_CHANNEL = 'whispr.notification.events';
 			const run = await freshRunEnvChecks();
 
 			run();

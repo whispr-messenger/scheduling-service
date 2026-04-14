@@ -1,11 +1,5 @@
 {
   "compilerOptions": {
-    "assets": [
-      {
-        "include": "src/modules/grpc/proto/*.proto",
-        "outDir": "dist/modules/grpc/proto"
-      }
-    ],
     "watchAssets": true
   }
 }

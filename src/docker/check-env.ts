@@ -73,13 +73,10 @@ export default function runEnvChecks(): void {
 	// main.ts reads PORT, while docker/health scripts may read HTTP_PORT.
 	// Accept either for startup validation to avoid false negatives.
 	checkRequiredOneOf(['PORT', 'HTTP_PORT']);
-	checkRequired('GRPC_PORT');
 
-	// External service endpoints (optional in Phase 1 when dispatching via BullMQ)
-	checkOptional('MESSAGING_SERVICE_HOST', '(not required for BullMQ dispatch)');
-	checkOptional('MESSAGING_SERVICE_PORT', '(not required for BullMQ dispatch)');
-	checkOptional('NOTIFICATION_SERVICE_HOST', '(reserved for future notification integration)');
-	checkOptional('NOTIFICATION_SERVICE_PORT', '(reserved for future notification integration)');
+	// Inter-service Redis pub/sub channels (defaults applied at runtime if absent)
+	checkOptional('MESSAGING_EVENTS_CHANNEL', 'whispr.messaging.events');
+	checkOptional('NOTIFICATION_EVENTS_CHANNEL', 'whispr.notification.events');
 
 	console.log('\nChecking OPTIONAL environment variables...');
 

@@ -18,7 +18,8 @@ import { CronUtil } from '@/common/utils/cron.util';
 import { TimezoneUtil } from '@/common/utils/timezone.util';
 import { RetryUtil } from '@/common/utils/retry.util';
 import { QueueService } from '@/modules/queues/services/queue.service';
-import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
+import { MessagingEventsService } from '@/modules/events/services/messaging-events.service';
+import { NotificationEventsService } from '@/modules/events/services/notification-events.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -35,8 +36,8 @@ export class SchedulerService {
 		@InjectRepository(JobCategory)
 		private readonly jobCategoryRepository: Repository<JobCategory>,
 		private readonly queueService: QueueService,
-		@Inject(forwardRef(() => MessagingGrpcClient))
-		private readonly messagingClient: MessagingGrpcClient
+		private readonly messagingEvents: MessagingEventsService,
+		private readonly notificationEvents: NotificationEventsService
 	) {}
 
 	async createJob(createJobDto: CreateJobDto): Promise<JobResponseDto> {
@@ -185,12 +186,9 @@ export class SchedulerService {
 			// Execute job with timeout
 			const result = await this.executeWithTimeout(job, job.timeoutSeconds * 1000);
 
-			// Phase 1.5: for messaging jobs we only dispatch to queue.
-			// Do not mark execution as COMPLETED when downstream processing has not happened yet.
-			const isDispatchOnly =
-				job.targetService === 'messaging' &&
-				typeof result === 'object' &&
-				result?.dispatchStatus === 'queued';
+			// Inter-service jobs are dispatched via Redis pub/sub. Execution stays PENDING until a
+			// downstream consumer acks; we only know the event was published here.
+			const isDispatchOnly = typeof result === 'object' && result?.dispatchStatus === 'published';
 
 			// Update execution status
 			const duration = Date.now() - startTime;
@@ -405,8 +403,7 @@ export class SchedulerService {
 
 		switch (job.targetMethod) {
 			case 'sendScheduledMessage': {
-				// Phase 1 semantics: execution succeeds when dispatch is accepted by queue, not when message is delivered.
-				const dispatch = await this.messagingClient.sendScheduledMessage({
+				const dispatch = await this.messagingEvents.sendScheduledMessage({
 					conversationId: payload.conversationId,
 					senderId: payload.senderId,
 					messageType: payload.messageType || 'TEXT',
@@ -417,26 +414,25 @@ export class SchedulerService {
 				return {
 					targetService: 'messaging',
 					targetMethod: job.targetMethod,
-					dispatchStatus: 'queued',
+					dispatchStatus: 'published',
 					dispatchId: dispatch.messageId,
-					transport: 'bullmq',
-					queuedAt: dispatch.sentAt,
+					transport: 'redis-pubsub',
+					publishedAt: dispatch.sentAt,
 				};
 			}
 
 			case 'cleanupExpiredMessages': {
-				// Keep targetMethod compatibility while switching transport from gRPC to queue dispatch.
-				const dispatch = await this.messagingClient.cleanupExpiredMessages({
+				const dispatch = await this.messagingEvents.cleanupExpiredMessages({
 					olderThan: new Date(payload.olderThan),
 					batchSize: payload.batchSize,
 				});
 				return {
 					targetService: 'messaging',
 					targetMethod: job.targetMethod,
-					dispatchStatus: dispatch.status || 'queued',
+					dispatchStatus: dispatch.status || 'published',
 					dispatchId: dispatch.dispatchId,
-					transport: 'bullmq',
-					queuedAt: dispatch.processedAt,
+					transport: 'redis-pubsub',
+					publishedAt: dispatch.processedAt,
 				};
 			}
 
@@ -446,16 +442,18 @@ export class SchedulerService {
 	}
 
 	private async executeNotificationJob(job: Job): Promise<any> {
-		this.logger.warn('Notification job executed with placeholder', {
-			targetMethod: job.targetMethod,
+		const dispatch = await this.notificationEvents.dispatch({
+			method: job.targetMethod,
+			payload: job.payload as Record<string, any>,
 		});
 
 		return {
-			service: 'notification',
-			method: job.targetMethod,
-			payload: job.payload,
-			executedAt: new Date().toISOString(),
-			status: 'placeholder',
+			targetService: 'notification',
+			targetMethod: job.targetMethod,
+			dispatchStatus: 'published',
+			dispatchId: dispatch.dispatchId,
+			transport: 'redis-pubsub',
+			publishedAt: dispatch.dispatchedAt,
 		};
 	}
 

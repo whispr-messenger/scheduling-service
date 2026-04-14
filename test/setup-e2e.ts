@@ -5,7 +5,6 @@ import { Test } from '@nestjs/testing';
 beforeAll(async () => {
 	process.env.NODE_ENV = 'test';
 	process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
-	process.env.GRPC_PORT = process.env.GRPC_PORT || '50053';
 });
 
 // Global E2E teardown

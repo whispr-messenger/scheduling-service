@@ -5,7 +5,7 @@ import { SchedulerController } from './controllers/scheduler.controller';
 import { SchedulerService } from './services/scheduler.service';
 import { DatabaseModule } from '@/modules/database/database.module';
 import { QueuesModule } from '@/modules/queues/queues.module';
-import { GrpcModule } from '@/modules/grpc/grpc.module';
+import { EventsModule } from '@/modules/events/events.module';
 import { CommonModule } from '@/common/common.module';
 import { Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency } from './entities';
 
@@ -23,7 +23,7 @@ import { Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobD
 			JobDependency,
 		]),
 		forwardRef(() => QueuesModule),
-		forwardRef(() => GrpcModule),
+		EventsModule,
 		CommonModule,
 	],
 	controllers: [SchedulerController],
