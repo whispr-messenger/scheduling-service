@@ -1,6 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Test } from '@nestjs/testing';
 
+jest.mock('@nest-lab/throttler-storage-redis', () => {
+	const ThrottlerStorageRedisService = jest.fn().mockImplementation(() => ({
+		increment: jest.fn().mockResolvedValue({
+			totalHits: 1,
+			timeToExpire: 60000,
+			isBlocked: false,
+			timeToBlockExpire: 0,
+		}),
+		onModuleDestroy: jest.fn(),
+	}));
+	return { ThrottlerStorageRedisService };
+});
+
 // E2E test setup
 beforeAll(async () => {
 	process.env.NODE_ENV = 'test';
