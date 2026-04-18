@@ -1,6 +1,6 @@
 # Whispr Scheduling Service
 
-Service central d'orchestration des tâches pour l'application Whispr messenger. Ce service gère la planification et l'exécution de toutes les tâches asynchrones de l'écosystème Whispr.
+Service central d'orchestration des tâches pour l'application Whispr Messenger. Ce service gère la planification et l'exécution de toutes les tâches asynchrones de l'écosystème Whispr.
 
 ## 🎯 Fonctionnalités
 
