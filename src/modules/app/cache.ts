@@ -33,7 +33,20 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 		client = createSentinel({
 			name: masterName,
 			sentinelRootNodes,
-			nodeClientOptions: { username, password, database: db },
+			nodeClientOptions: {
+				database: db,
+				...(username || password
+					? {
+							credentialsProvider: {
+								type: 'async-credentials-provider' as const,
+								credentials: async () => ({
+									username: username ?? 'default',
+									password: password ?? '',
+								}),
+							},
+						}
+					: {}),
+			},
 			sentinelClientOptions: { password: sentinelPassword },
 		});
 	} else {
