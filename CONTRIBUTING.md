@@ -13,3 +13,9 @@ npm run start:dev
 npm test
 npm run test:e2e
 ```
+
+## Conventions
+
+- Conventional commits
+- Branches : `WHISPR-XXX-description`
+- ESLint + Prettier (Husky hooks)
