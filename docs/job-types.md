@@ -10,3 +10,19 @@
 | cleanup | LOW | Suppression données expirées |
 | reports | MEDIUM | Génération de rapports |
 | analytics | LOW | Traitement analytique |
+
+## Flux d'exécution d'un job
+
+```
+Création ──▶ Queue Bull ──▶ Worker pick ──▶ Exécution
+    │                                          │
+    │                                    ┌─────▼─────┐
+    │                                    │  Succès?  │
+    │                                    └─────┬─────┘
+    │                                     oui  │  non
+    │                                    ┌─────┼─────┐
+    │                                    │     │     │
+    │                                  Done  Retry  Failed
+    │                                          │
+    │                                    (max retries)
+```
