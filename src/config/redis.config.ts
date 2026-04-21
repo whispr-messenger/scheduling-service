@@ -11,6 +11,7 @@ export function parseSentinels(sentinelsStr: string): Array<{ host: string; port
 export function buildRedisOptions(configService: ConfigService): RedisOptions {
 	const mode = configService.get<string>('REDIS_MODE', 'direct');
 	const db = Number.parseInt(configService.get<string>('REDIS_DB', '0'), 10);
+	const username = configService.get<string>('REDIS_USERNAME');
 	const password = configService.get<string>('REDIS_PASSWORD');
 
 	if (mode === 'sentinel') {
@@ -25,6 +26,7 @@ export function buildRedisOptions(configService: ConfigService): RedisOptions {
 			sentinels: parseSentinels(sentinelsStr),
 			name: masterName,
 			db,
+			username,
 			password,
 			sentinelPassword,
 			enableReadyCheck: true,
@@ -36,6 +38,7 @@ export function buildRedisOptions(configService: ConfigService): RedisOptions {
 		host: configService.get<string>('REDIS_HOST', 'localhost'),
 		port: Number.parseInt(configService.get<string>('REDIS_PORT', '6379'), 10),
 		db,
+		username,
 		password,
 		maxRetriesPerRequest: 3,
 		lazyConnect: true,
