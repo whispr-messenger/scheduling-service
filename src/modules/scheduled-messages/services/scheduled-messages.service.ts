@@ -9,6 +9,7 @@ import { UpdateScheduledMessageDto } from '../dto/update-scheduled-message.dto';
 import { ScheduledMessageResponseDto } from '../dto/scheduled-message-response.dto';
 import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
 import Redis from 'ioredis';
+import { buildRedisOptions } from '@/config/redis.config';
 
 const LOCK_KEY_PREFIX = 'scheduled-messages:lock:';
 const LOCK_TTL_SECONDS = 55;
@@ -24,12 +25,7 @@ export class ScheduledMessagesService {
 		private readonly messagingClient: MessagingGrpcClient,
 		private readonly configService: ConfigService
 	) {
-		this.redis = new Redis({
-			host: this.configService.get('REDIS_HOST', 'localhost'),
-			port: this.configService.get('REDIS_PORT', 6379),
-			password: this.configService.get('REDIS_PASSWORD'), // NOSONAR — read from env, not hardcoded
-			db: this.configService.get('REDIS_DB', 0),
-		});
+		this.redis = new Redis(buildRedisOptions(this.configService));
 	}
 
 	async create(dto: CreateScheduledMessageDto): Promise<ScheduledMessageResponseDto> {
