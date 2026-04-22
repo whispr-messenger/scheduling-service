@@ -1,8 +1,6 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ClientGrpc, Client, Transport } from '@nestjs/microservices';
-import { join } from 'path';
-import { firstValueFrom, Observable } from 'rxjs';
+import { Inject, Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { ClientGrpc } from '@nestjs/microservices';
+import { firstValueFrom, Observable, TimeoutError, timeout } from 'rxjs';
 
 // Messaging service interface
 export interface MessagingServiceClient {
@@ -10,6 +8,8 @@ export interface MessagingServiceClient {
 	cleanupExpiredMessages(data: CleanupRequest): Observable<CleanupResponse>;
 	healthCheck(): Observable<HealthResponse>;
 }
+
+const GRPC_CALL_TIMEOUT_MS = 5_000;
 
 export interface SendScheduledMessageRequest {
 	conversationId: string;
@@ -46,28 +46,24 @@ export class MessagingGrpcClient implements OnModuleInit {
 	private readonly logger = new Logger(MessagingGrpcClient.name);
 	private messagingService: MessagingServiceClient;
 
-	@Client({
-		transport: Transport.GRPC,
-		options: {
-			package: 'whispr.messaging',
-			protoPath: join(__dirname, '../proto/messaging.proto'),
-			url: 'localhost:40010',
-			loader: {
-				keepCase: true,
-				longs: String,
-				enums: String,
-				defaults: true,
-				oneofs: true,
-			},
-		},
-	})
-	private client: ClientGrpc;
-
-	constructor(private configService: ConfigService) {}
+	constructor(@Inject('MESSAGING_SERVICE') private readonly client: ClientGrpc) {}
 
 	onModuleInit() {
 		this.messagingService = this.client.getService<MessagingServiceClient>('MessagingService');
 		this.logger.log('Messaging gRPC client initialized');
+	}
+
+	private async call<T>(label: string, observable: Observable<T>): Promise<T> {
+		try {
+			return await firstValueFrom(observable.pipe(timeout(GRPC_CALL_TIMEOUT_MS)));
+		} catch (error) {
+			if (error instanceof TimeoutError) {
+				throw new Error(`Messaging gRPC call "${label}" timed out after ${GRPC_CALL_TIMEOUT_MS}ms`, {
+					cause: error,
+				});
+			}
+			throw error;
+		}
 	}
 
 	async sendScheduledMessage(request: SendScheduledMessageRequest): Promise<SendMessageResponse> {
@@ -77,7 +73,10 @@ export class MessagingGrpcClient implements OnModuleInit {
 		});
 
 		try {
-			const response = await firstValueFrom(this.messagingService.sendScheduledMessage(request));
+			const response = await this.call(
+				'sendScheduledMessage',
+				this.messagingService.sendScheduledMessage(request)
+			);
 
 			this.logger.log('Scheduled message sent successfully', {
 				messageId: response.messageId,
@@ -101,7 +100,10 @@ export class MessagingGrpcClient implements OnModuleInit {
 		});
 
 		try {
-			const response = await firstValueFrom(this.messagingService.cleanupExpiredMessages(request));
+			const response = await this.call(
+				'cleanupExpiredMessages',
+				this.messagingService.cleanupExpiredMessages(request)
+			);
 
 			this.logger.log('Message cleanup completed', {
 				deletedCount: response.deletedCount,
@@ -118,9 +120,7 @@ export class MessagingGrpcClient implements OnModuleInit {
 
 	async healthCheck(): Promise<HealthResponse> {
 		try {
-			const response = await firstValueFrom(this.messagingService.healthCheck());
-
-			return response;
+			return await this.call('healthCheck', this.messagingService.healthCheck());
 		} catch (error) {
 			this.logger.error('Messaging service health check failed', {
 				error: error.message,
