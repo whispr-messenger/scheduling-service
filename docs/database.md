@@ -1,25 +1,42 @@
 # Base de données
 
-## Tables principales
+## Tables
 
 ```
-┌──────────────┐     ┌───────────────┐
-│    jobs      │────▶│  executions   │
-│              │     │               │
-│ - id         │     │ - id          │
-│ - name       │     │ - job_id      │
-│ - category   │     │ - status      │
-│ - payload    │     │ - started_at  │
+┌──────────────┐     ┌───────────────┐     ┌────────────────┐
+│    jobs      │────▶│  executions   │     │ execution_logs │
+│              │     │               │     │                │
+│ - id         │     │ - id          │     │ - id           │
+│ - name       │     │ - job_id      │     │ - execution_id │
+│ - category   │     │ - status      │     │ - log_entry    │
+│ - payload    │     │ - started_at  │     └────────────────┘
 │ - priority   │     │ - finished_at │
-└──────────────┘     └───────────────┘
-        │
-        ▼
-┌──────────────┐
-│  schedules   │
-│              │
-│ - id         │
-│ - job_id     │
-│ - cron_expr  │
-│ - next_run   │
-└──────────────┘
+└──────┬───────┘     └───────────────┘
+       │
+  ┌────┼──────────────┐
+  │    │              │
+┌─▼────▼───┐  ┌───────▼──────┐  ┌────────────────┐
+│ schedules│  │recurring_jobs│  │job_dependencies│
+│          │  │              │  │                │
+│ - job_id │  │ - job_id     │  │ - job_id       │
+│ - cron   │  │ - interval   │  │ - depends_on   │
+└──────────┘  └──────────────┘  └────────────────┘
+
+┌──────────────────┐
+│ job_categories   │
+│                  │
+│ - id             │
+│ - name           │
+│ - priority       │
+└──────────────────┘
+
+┌──────────────────────┐
+│ scheduled_messages   │
+│                      │
+│ - id                 │
+│ - conversation_id    │
+│ - sender_id          │
+│ - content            │
+│ - scheduled_at       │
+└──────────────────────┘
 ```
