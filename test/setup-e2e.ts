@@ -18,6 +18,7 @@ jest.mock('@nest-lab/throttler-storage-redis', () => {
 beforeAll(async () => {
 	process.env.NODE_ENV = 'test';
 	process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+	process.env.JWT_JWKS_URL = process.env.JWT_JWKS_URL || 'http://localhost:9999/.well-known/jwks.json';
 	process.env.GRPC_PORT = process.env.GRPC_PORT || '50053';
 
 	// Database — use env vars if provided, otherwise fall back to k3d dev defaults
