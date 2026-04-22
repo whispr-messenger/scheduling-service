@@ -16,8 +16,8 @@ Le scheduling-service expose un serveur gRPC et communique avec le messaging-ser
 
 ## Méthodes exposées
 
-- `CreateJob` — Créer un job
-- `ScheduleJob` — Planifier un job
-- `ExecuteJob` — Exécuter immédiatement
-- `CancelSchedule` — Annuler une planification
-- `HealthCheck` — Vérifier l'état du service
+- `CreateJob` - Créer un job
+- `ScheduleJob` - Planifier un job
+- `ExecuteJob` - Exécuter immédiatement
+- `CancelSchedule` - Annuler une planification
+- `HealthCheck` - Vérifier l'état du service
