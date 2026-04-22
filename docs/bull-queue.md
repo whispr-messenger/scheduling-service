@@ -1,4 +1,4 @@
-# Bull Queue
+# BullMQ
 
 ## Architecture des files
 
