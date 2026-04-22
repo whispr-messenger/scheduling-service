@@ -41,15 +41,16 @@ const cacheModuleAsyncOptions: CacheModuleAsyncOptions = {
 	isGlobal: true,
 };
 
-// BullMQ Queue (Redis)
+// BullMQ Queue (Redis — supports direct + sentinel modes)
+// BullMQ requires maxRetriesPerRequest: null for workers' blocking commands
+// (see https://docs.bullmq.io/guide/connections)
 const bullModuleAsyncOptions = {
 	imports: [ConfigModule],
 	useFactory: (configService: ConfigService) => ({
 		connection: {
-			host: configService.get('REDIS_HOST', 'localhost'),
-			port: configService.get('REDIS_PORT', 6379),
-			password: configService.get('REDIS_PASSWORD'),
-			db: configService.get('REDIS_DB', 0),
+			...buildRedisOptions(configService),
+			maxRetriesPerRequest: null,
+			enableReadyCheck: false,
 		},
 		defaultJobOptions: {
 			removeOnComplete: 50,
