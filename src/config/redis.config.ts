@@ -17,6 +17,7 @@ export function buildRedisOptions(configService: ConfigService): RedisOptions {
 	if (mode === 'sentinel') {
 		const sentinelsStr = configService.get<string>('REDIS_SENTINELS');
 		const masterName = configService.get<string>('REDIS_MASTER_NAME');
+		const sentinelUsername = configService.get<string>('REDIS_SENTINEL_USERNAME');
 		const sentinelPassword = configService.get<string>('REDIS_SENTINEL_PASSWORD');
 
 		if (!sentinelsStr) throw new Error('REDIS_SENTINELS is required when REDIS_MODE=sentinel');
@@ -28,6 +29,7 @@ export function buildRedisOptions(configService: ConfigService): RedisOptions {
 			db,
 			username,
 			password,
+			sentinelUsername,
 			sentinelPassword,
 			enableReadyCheck: true,
 			maxRetriesPerRequest: 3,

@@ -12,6 +12,7 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 	if (mode === 'sentinel') {
 		const sentinelsStr = configService.get<string>('REDIS_SENTINELS', '');
 		const masterName = configService.get<string>('REDIS_MASTER_NAME', 'mymaster');
+		const sentinelUsername = configService.get<string>('REDIS_SENTINEL_USERNAME');
 		const sentinelPassword = configService.get<string>('REDIS_SENTINEL_PASSWORD');
 
 		const sentinelRootNodes = parseSentinels(sentinelsStr);
@@ -19,7 +20,7 @@ export function cacheModuleOptionsFactory(configService: ConfigService): CacheOp
 			name: masterName,
 			sentinelRootNodes,
 			nodeClientOptions: { username, password, database: db },
-			sentinelClientOptions: { password: sentinelPassword },
+			sentinelClientOptions: { username: sentinelUsername, password: sentinelPassword },
 		});
 
 		return {

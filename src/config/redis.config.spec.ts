@@ -77,4 +77,22 @@ describe('buildRedisOptions — sentinel mode', () => {
 		const cfg = makeConfig({ REDIS_MODE: 'sentinel', REDIS_SENTINELS: 's1:26379' });
 		expect(() => buildRedisOptions(cfg)).toThrow('REDIS_MASTER_NAME is required');
 	});
+
+	it('forwards sentinel ACL credentials when provided', () => {
+		const opts = buildRedisOptions(
+			makeConfig({
+				...baseEnv,
+				REDIS_USERNAME: 'app-user',
+				REDIS_PASSWORD: 'app-pass',
+				REDIS_SENTINEL_USERNAME: 'sentinel-user',
+				REDIS_SENTINEL_PASSWORD: 'sentinel-pass',
+			})
+		);
+		expect(opts).toMatchObject({
+			username: 'app-user',
+			password: 'app-pass',
+			sentinelUsername: 'sentinel-user',
+			sentinelPassword: 'sentinel-pass',
+		});
+	});
 });
