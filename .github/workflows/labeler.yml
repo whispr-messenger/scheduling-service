@@ -1,24 +1,25 @@
 name: 🏷️ Auto-Labeller
 
 on:
+  # Use pull_request (not pull_request_target) so the workflow runs with a
+  # read-only GITHUB_TOKEN for fork PRs - no secret leak possible.
   pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review]
-  pull_request_target:
-    types: [opened, edited, synchronize, reopened, ready_for_review]
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   auto-label:
     name: 🏷️ Label Pull Request
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: 🏷️ Apply Labels
-        uses: actions/labeler@v5
+        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           configuration-path: .github/labeler.yml
@@ -29,18 +30,22 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     needs: auto-label
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: 🔍 Analyze PR Impact
         id: analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_PAGER: ""
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Get changed files
           echo "Analyzing changed files..."
@@ -58,7 +63,7 @@ jobs:
           QUEUE_FILES="src/modules/queues/ src/queues/ src/modules/queues/processors/"
 
           # Get PR files
-          gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' > changed_files.txt
+          gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > changed_files.txt
 
           # Initialize flags
           CRITICAL_CHANGED=false
@@ -80,7 +85,7 @@ jobs:
             # Check critical files
             for pattern in $CRITICAL_FILES; do
               if [[ "$file" == *"$pattern"* ]]; then
-                echo "critical=true" >> $GITHUB_OUTPUT
+                echo "critical=true" >> "$GITHUB_OUTPUT"
                 CRITICAL_CHANGED=true
                 break
               fi
@@ -89,7 +94,7 @@ jobs:
             # Check security files
             for pattern in $SECURITY_FILES; do
               if [[ "$file" == *"$pattern"* ]]; then
-                echo "security=true" >> $GITHUB_OUTPUT
+                echo "security=true" >> "$GITHUB_OUTPUT"
                 SECURITY_CHANGED=true
                 break
               fi
@@ -97,78 +102,78 @@ jobs:
 
             # Check scheduler files
             if [[ "$file" == *"scheduler"* ]] || [[ "$file" == *"cron"* ]]; then
-              echo "scheduler=true" >> $GITHUB_OUTPUT
+              echo "scheduler=true" >> "$GITHUB_OUTPUT"
               SCHEDULER_CHANGED=true
             fi
 
             # Check queue files
             if [[ "$file" == *"queue"* ]] || [[ "$file" == *"bull"* ]] || [[ "$file" == *"processor"* ]]; then
-              echo "queue=true" >> $GITHUB_OUTPUT
+              echo "queue=true" >> "$GITHUB_OUTPUT"
               QUEUE_CHANGED=true
             fi
 
             # Check gRPC
             if [[ "$file" == *"grpc"* ]] || [[ "$file" == *".proto"* ]]; then
-              echo "grpc=true" >> $GITHUB_OUTPUT
+              echo "grpc=true" >> "$GITHUB_OUTPUT"
               GRPC_CHANGED=true
             fi
 
             # Check monitoring
             if [[ "$file" == *"monitoring"* ]] || [[ "$file" == *"health"* ]] || [[ "$file" == *"metrics"* ]]; then
-              echo "monitoring=true" >> $GITHUB_OUTPUT
+              echo "monitoring=true" >> "$GITHUB_OUTPUT"
               MONITORING_CHANGED=true
             fi
 
             # Check cache/Redis
             if [[ "$file" == *"cache"* ]] || [[ "$file" == *"redis"* ]]; then
-              echo "cache=true" >> $GITHUB_OUTPUT
+              echo "cache=true" >> "$GITHUB_OUTPUT"
               CACHE_CHANGED=true
             fi
 
             # Check Istio/Service Mesh
             if [[ "$file" == *"istio"* ]] || [[ "$file" == *"mtls"* ]] || [[ "$file" == *"virtualservice"* ]]; then
-              echo "istio=true" >> $GITHUB_OUTPUT
+              echo "istio=true" >> "$GITHUB_OUTPUT"
               ISTIO_CHANGED=true
             fi
 
             # Check database changes
             if [[ "$file" == *"migration"* ]] || [[ "$file" == *"entities"* ]] || [[ "$file" == *"entity.ts"* ]] || [[ "$file" == *"database.config"* ]]; then
-              echo "database=true" >> $GITHUB_OUTPUT
+              echo "database=true" >> "$GITHUB_OUTPUT"
               DATABASE_CHANGED=true
             fi
 
             # Check test files
             if [[ "$file" == *".spec.ts"* ]] || [[ "$file" == *".test.ts"* ]] || [[ "$file" == *"test/"* ]] || [[ "$file" == *".e2e-spec.ts"* ]]; then
-              echo "tests=true" >> $GITHUB_OUTPUT
+              echo "tests=true" >> "$GITHUB_OUTPUT"
               TESTS_CHANGED=true
             fi
 
             # Check documentation
             if [[ "$file" == *".md"* ]] || [[ "$file" == *"documentation/"* ]] || [[ "$file" == *"docs/"* ]]; then
-              echo "docs=true" >> $GITHUB_OUTPUT
+              echo "docs=true" >> "$GITHUB_OUTPUT"
               DOCS_CHANGED=true
             fi
 
           done < changed_files.txt
 
           # Calculate PR size
-          CHANGED_LINES=$(gh pr view ${{ github.event.pull_request.number }} --json additions,deletions --jq '.additions + .deletions')
-          echo "changed_lines=$CHANGED_LINES" >> $GITHUB_OUTPUT
+          CHANGED_LINES=$(gh pr view "$PR_NUMBER" --json additions,deletions --jq '.additions + .deletions')
+          echo "changed_lines=$CHANGED_LINES" >> "$GITHUB_OUTPUT"
 
           if (( CHANGED_LINES > 500 )); then
-            echo "size=XL" >> $GITHUB_OUTPUT
+            echo "size=XL" >> "$GITHUB_OUTPUT"
           elif (( CHANGED_LINES > 200 )); then
-            echo "size=L" >> $GITHUB_OUTPUT
+            echo "size=L" >> "$GITHUB_OUTPUT"
           elif (( CHANGED_LINES > 50 )); then
-            echo "size=M" >> $GITHUB_OUTPUT
+            echo "size=M" >> "$GITHUB_OUTPUT"
           elif (( CHANGED_LINES > 10 )); then
-            echo "size=S" >> $GITHUB_OUTPUT
+            echo "size=S" >> "$GITHUB_OUTPUT"
           else
-            echo "size=XS" >> $GITHUB_OUTPUT
+            echo "size=XS" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 🎯 Apply Priority Labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -251,7 +256,7 @@ jobs:
 
       - name: 📝 Comment on PR
         if: steps.analyze.outputs.critical == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
