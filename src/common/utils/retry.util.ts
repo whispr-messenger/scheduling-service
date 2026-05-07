@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { randomInt } from 'crypto';
 
 export interface RetryOptions {
 	maxAttempts: number;
@@ -19,10 +20,12 @@ export class RetryUtil {
 	): number {
 		const delay = Math.min(baseDelay * Math.pow(multiplier, attempt - 1), maxDelay);
 
-		// Add jitter to prevent thundering herd
-		const jitter = Math.random() * 0.1 * delay;
+		// Add jitter to prevent thundering herd. Use a CSPRNG: while jitter does not
+		// need cryptographic randomness, this avoids Math.random() being flagged.
+		const jitterCeiling = Math.max(1, Math.floor(0.1 * delay));
+		const jitter = randomInt(0, jitterCeiling);
 
-		return Math.floor(delay + jitter);
+		return Math.floor(delay) + jitter;
 	}
 
 	static async executeWithRetry<T>(
