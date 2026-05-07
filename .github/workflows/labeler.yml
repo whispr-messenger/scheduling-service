@@ -1,7 +1,9 @@
 name: 🏷️ Auto-Labeller
 
 on:
-  pull_request_target:
+  # Use pull_request (not pull_request_target) so the workflow runs with a
+  # read-only GITHUB_TOKEN for fork PRs - no secret leak possible.
+  pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review]
 
 permissions: {}
@@ -26,13 +28,7 @@ jobs:
   priority-labeler:
     name: 🎯 Priority & Impact Assessment
     runs-on: ubuntu-latest
-    # Skip forks entirely: pull_request_target runs with secrets on the base repo,
-    # so we must never check out fork-controlled refs.
-    if: >-
-      ${{
-        github.event.pull_request.draft == false &&
-        github.event.pull_request.head.repo.fork == false
-      }}
+    if: github.event.pull_request.draft == false
     needs: auto-label
     permissions:
       contents: read
@@ -42,8 +38,6 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # Always checkout the base branch SHA (trusted), not the PR head.
-          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
       - name: 🔍 Analyze PR Impact
