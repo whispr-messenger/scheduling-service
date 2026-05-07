@@ -1,6 +1,9 @@
 name: CD Pipeline
 
 on:
+  # workflow_run runs in the base repo's context with access to secrets. The
+  # job-level if and step-level if checks below filter on
+  # workflow_run.head_repository.fork == false to never run untrusted fork code.
   workflow_run:
     workflows: [🚀 CI Pipeline]
     types: [completed]
