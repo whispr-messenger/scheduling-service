@@ -26,7 +26,13 @@ jobs:
   priority-labeler:
     name: 🎯 Priority & Impact Assessment
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    # Skip forks entirely: pull_request_target runs with secrets on the base repo,
+    # so we must never check out fork-controlled refs.
+    if: >-
+      ${{
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.fork == false
+      }}
     needs: auto-label
     permissions:
       contents: read
@@ -36,7 +42,7 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # Stay on base ref to avoid running untrusted code from forks via pull_request_target.
+          # Always checkout the base branch SHA (trusted), not the PR head.
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
