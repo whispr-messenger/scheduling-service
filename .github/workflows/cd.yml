@@ -42,6 +42,13 @@ jobs:
           private_key: ${{ secrets.ACTIONS_CD_PRIVATE_KEY }}
 
       - name: Checkout scheduling-service
+        # Explicit fork guard at the step level so Sonar S7631 sees the protection.
+        # The job-level if already filters forks; this is a defence-in-depth check.
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            github.event.workflow_run.head_repository.fork == false
+          }}
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: scheduling-service
@@ -135,6 +142,12 @@ jobs:
           fi
 
       - name: Checkout infrastructure repository
+        # Defence-in-depth: never run if the upstream CI ran from a fork.
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            github.event.workflow_run.head_repository.fork == false
+          }}
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: whispr-messenger/infrastructure
