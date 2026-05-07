@@ -11,8 +11,8 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/node_modules \
     && chown -R node:node /workspace
 
-COPY --chown=node:node ./docker/test/entrypoint.sh /tmp/entrypoint.sh
-RUN chmod +x /tmp/entrypoint.sh
+# Copy as root, read+execute only - the entrypoint is intentionally immutable.
+COPY --chown=root:root --chmod=555 ./docker/test/entrypoint.sh /tmp/entrypoint.sh
 
 USER node
 
