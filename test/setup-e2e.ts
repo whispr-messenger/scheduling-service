@@ -38,6 +38,10 @@ beforeAll(async () => {
 		process.env.REDIS_PASSWORD = 'whispr_dev_password'; // NOSONAR - test environment default, not a real credential
 	}
 	process.env.REDIS_DB = process.env.REDIS_DB || '4';
+
+	// HMAC secret for webhook signing - required by WebhookHmacService
+	process.env.WEBHOOK_HMAC_SECRET =
+		process.env.WEBHOOK_HMAC_SECRET || 'test-webhook-secret-e2e-placeholder'; // NOSONAR - test environment default
 });
 
 // Global E2E teardown
