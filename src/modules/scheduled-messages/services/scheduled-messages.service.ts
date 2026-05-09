@@ -9,15 +9,27 @@ import { UpdateScheduledMessageDto } from '../dto/update-scheduled-message.dto';
 import { ScheduledMessageResponseDto } from '../dto/scheduled-message-response.dto';
 import { MessagingGrpcClient } from '@/modules/grpc/clients/messaging.client';
 import Redis from 'ioredis';
+import { randomUUID } from 'crypto';
 import { buildRedisOptions } from '@/config/redis.config';
 
 const LOCK_KEY_PREFIX = 'scheduled-messages:lock:';
 const LOCK_TTL_SECONDS = 55;
 
+// Lua atomique : ne supprime la cle que si la valeur appartient a ce process.
+// Evite qu'un pod expire son lock et delete celui d'un autre pod.
+const RELEASE_LOCK_LUA = `if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+else
+  return 0
+end`;
+
 @Injectable()
 export class ScheduledMessagesService {
 	private readonly logger = new Logger(ScheduledMessagesService.name);
 	private readonly redis: Redis;
+	// Identifiant unique du process : sert de owner pour le lock distribue.
+	// Genere une seule fois par instance, persiste tant que le pod est up.
+	private readonly lockOwnerId = `${process.pid}:${randomUUID()}`;
 
 	constructor(
 		@InjectRepository(ScheduledMessage)
@@ -213,14 +225,27 @@ export class ScheduledMessagesService {
 	/**
 	 * Acquires a distributed lock using Redis SET NX EX.
 	 * Returns true if the lock was acquired, false otherwise.
+	 * Stocke un owner ID unique pour permettre une release sure.
 	 */
 	private async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
-		const result = await this.redis.set(key, process.pid.toString(), 'EX', ttlSeconds, 'NX');
+		const result = await this.redis.set(key, this.lockOwnerId, 'EX', ttlSeconds, 'NX');
 		return result === 'OK';
 	}
 
+	/**
+	 * Release atomique via script Lua cote Redis : delete uniquement si la
+	 * valeur correspond a notre owner ID. Sinon, le lock appartient a un autre
+	 * pod (le notre a expire) et on ne touche a rien.
+	 */
 	private async releaseLock(key: string): Promise<void> {
-		await this.redis.del(key);
+		try {
+			await this.redis.eval(RELEASE_LOCK_LUA, 1, key, this.lockOwnerId);
+		} catch (error) {
+			this.logger.warn('Failed to release scheduled-messages lock', {
+				key,
+				error: (error as Error).message,
+			});
+		}
 	}
 
 	private toResponse(message: ScheduledMessage): ScheduledMessageResponseDto {
