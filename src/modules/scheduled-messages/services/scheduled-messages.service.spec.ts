@@ -33,17 +33,41 @@ jest.mock('ioredis', () => {
 
 describe('ScheduledMessagesService', () => {
 	let service: ScheduledMessagesService;
-	let repository: { create: jest.Mock; save: jest.Mock; find: jest.Mock; findOne: jest.Mock };
+	let repository: {
+		create: jest.Mock;
+		save: jest.Mock;
+		find: jest.Mock;
+		findOne: jest.Mock;
+		createQueryBuilder: jest.Mock;
+	};
 	let messagingClient: { sendScheduledMessage: jest.Mock };
+	// QueryBuilder fluent partage par tous les tests : permet de configurer le
+	// retour du UPDATE ... RETURNING * utilise par claimDueMessages.
+	let queryBuilder: {
+		update: jest.Mock;
+		set: jest.Mock;
+		where: jest.Mock;
+		returning: jest.Mock;
+		execute: jest.Mock;
+	};
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
+
+		queryBuilder = {
+			update: jest.fn().mockReturnThis(),
+			set: jest.fn().mockReturnThis(),
+			where: jest.fn().mockReturnThis(),
+			returning: jest.fn().mockReturnThis(),
+			execute: jest.fn().mockResolvedValue({ raw: [] }),
+		};
 
 		repository = {
 			create: jest.fn((entity) => entity),
 			save: jest.fn((entity) => Promise.resolve({ ...entity, id: 'persisted-id' })),
 			find: jest.fn().mockResolvedValue([]),
 			findOne: jest.fn(),
+			createQueryBuilder: jest.fn(() => queryBuilder),
 		};
 
 		messagingClient = {
@@ -173,6 +197,78 @@ describe('ScheduledMessagesService', () => {
 			await service.processDueMessages();
 
 			expect(redisMock.runScript).toHaveBeenCalledTimes(1);
+		});
+
+		it('claim atomique : marque les messages PROCESSING avant envoi', async () => {
+			redisMock.set.mockResolvedValue('OK');
+			redisMock.runScript.mockResolvedValue(1);
+
+			const dueMessage = {
+				id: 'msg-1',
+				userId: 'u',
+				conversationId: 'c',
+				content: 'hello',
+				metadata: null,
+				scheduledAt: new Date(Date.now() - 1000),
+				status: ScheduledMessageStatus.PENDING,
+			};
+
+			repository.find.mockResolvedValue([{ id: dueMessage.id }]);
+			queryBuilder.execute.mockResolvedValue({ raw: [dueMessage] });
+			messagingClient.sendScheduledMessage.mockResolvedValue({ ok: true });
+
+			await service.processDueMessages();
+
+			// Le SELECT initial doit ne demander que les IDs.
+			expect(repository.find).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({ status: ScheduledMessageStatus.PENDING }),
+					select: ['id'],
+				})
+			);
+
+			// L'UPDATE doit poser le filtre status=PENDING (claim atomique).
+			expect(queryBuilder.set).toHaveBeenCalledWith({ status: ScheduledMessageStatus.PROCESSING });
+			expect(queryBuilder.where).toHaveBeenCalledWith(
+				expect.objectContaining({ status: ScheduledMessageStatus.PENDING })
+			);
+
+			// Le message claim a bien ete envoye.
+			expect(messagingClient.sendScheduledMessage).toHaveBeenCalledTimes(1);
+		});
+
+		it('lock expire : un 2e processDueMessages ne retraite pas les messages deja PROCESSING', async () => {
+			redisMock.set.mockResolvedValue('OK');
+			redisMock.runScript.mockResolvedValue(1);
+
+			// Pod A claim le message au 1er tick.
+			const claimedMessage = {
+				id: 'msg-already-claimed',
+				userId: 'u',
+				conversationId: 'c',
+				content: 'hello',
+				metadata: null,
+				scheduledAt: new Date(Date.now() - 1000),
+				status: ScheduledMessageStatus.PENDING,
+			};
+			repository.find.mockResolvedValueOnce([{ id: claimedMessage.id }]);
+			queryBuilder.execute.mockResolvedValueOnce({ raw: [claimedMessage] });
+			messagingClient.sendScheduledMessage.mockResolvedValue({ ok: true });
+
+			await service.processDueMessages();
+			expect(messagingClient.sendScheduledMessage).toHaveBeenCalledTimes(1);
+
+			messagingClient.sendScheduledMessage.mockClear();
+
+			// 2e tick : pod B prend le lock (le notre a expire). La candidate query
+			// ne renvoie aucun nouveau PENDING, et meme si elle en renvoyait, l'UPDATE
+			// conditionne sur status=PENDING ne matcherait plus rien.
+			repository.find.mockResolvedValueOnce([]);
+			queryBuilder.execute.mockResolvedValueOnce({ raw: [] });
+
+			await service.processDueMessages();
+
+			expect(messagingClient.sendScheduledMessage).not.toHaveBeenCalled();
 		});
 
 		it('deux instances ont des owner IDs distincts (cas multi-pod)', async () => {
