@@ -9,7 +9,19 @@ const CONCURRENCY = Number.isFinite(PARSED_CONCURRENCY) ? Math.max(1, PARSED_CON
 // maxStalledCount aligne avec attempts pour ne pas drop silencieusement les jobs OOM-killed
 const MAX_STALLED_COUNT = 5;
 
-@Processor('high-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
+// options worker partagees par les trois processors (concurrency + maxStalledCount)
+const WORKER_OPTS = { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT };
+
+// helper alerting commun : log warn-level pour Sonar/Loki sur job echoue apres tous les retries
+function logFailedEvent(logger: Logger, label: string, job: Job, err: Error): void {
+	logger.warn(`${label} worker failed event`, {
+		bullJobId: job?.id,
+		attemptsMade: job?.attemptsMade,
+		error: err?.message,
+	});
+}
+
+@Processor('high-priority', WORKER_OPTS)
 export class HighPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(HighPriorityJobProcessor.name);
 
@@ -51,18 +63,13 @@ export class HighPriorityJobProcessor extends WorkerHost {
 		}
 	}
 
-	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
 	@OnWorkerEvent('failed')
 	onFailed(job: Job, err: Error): void {
-		this.logger.warn('High priority worker failed event', {
-			bullJobId: job?.id,
-			attemptsMade: job?.attemptsMade,
-			error: err?.message,
-		});
+		logFailedEvent(this.logger, 'High priority', job, err);
 	}
 }
 
-@Processor('medium-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
+@Processor('medium-priority', WORKER_OPTS)
 export class MediumPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(MediumPriorityJobProcessor.name);
 
@@ -104,18 +111,13 @@ export class MediumPriorityJobProcessor extends WorkerHost {
 		}
 	}
 
-	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
 	@OnWorkerEvent('failed')
 	onFailed(job: Job, err: Error): void {
-		this.logger.warn('Medium priority worker failed event', {
-			bullJobId: job?.id,
-			attemptsMade: job?.attemptsMade,
-			error: err?.message,
-		});
+		logFailedEvent(this.logger, 'Medium priority', job, err);
 	}
 }
 
-@Processor('low-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
+@Processor('low-priority', WORKER_OPTS)
 export class LowPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(LowPriorityJobProcessor.name);
 
@@ -157,13 +159,8 @@ export class LowPriorityJobProcessor extends WorkerHost {
 		}
 	}
 
-	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
 	@OnWorkerEvent('failed')
 	onFailed(job: Job, err: Error): void {
-		this.logger.warn('Low priority worker failed event', {
-			bullJobId: job?.id,
-			attemptsMade: job?.attemptsMade,
-			error: err?.message,
-		});
+		logFailedEvent(this.logger, 'Low priority', job, err);
 	}
 }
