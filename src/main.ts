@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import helmet from 'helmet';
 import { AppModule } from './modules/app/app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -19,6 +20,26 @@ async function bootstrap() {
 	});
 
 	const configService = app.get(ConfigService);
+
+	// WHISPR-1348 : entêtes de sécurité HTTP (CSP, HSTS, X-Frame-Options, etc.)
+	// alignés sur auth-service / user-service / media-service. CSP désactivée
+	// quand Swagger est servi en non-prod pour ne pas bloquer le SwaggerUI inline.
+	const swaggerEnabled = configService.get('SWAGGER_ENABLED', 'true') === 'true';
+	app.use(
+		helmet({
+			contentSecurityPolicy: swaggerEnabled
+				? {
+						directives: {
+							defaultSrc: ["'self'"],
+							scriptSrc: ["'self'", "'unsafe-inline'"],
+							styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+							imgSrc: ["'self'", 'data:'],
+						},
+					}
+				: undefined,
+			crossOriginEmbedderPolicy: swaggerEnabled ? false : undefined,
+		})
+	);
 
 	// Enable CORS if configured
 	if (configService.get('CORS_ENABLED', 'true') === 'true') {
@@ -61,7 +82,7 @@ async function bootstrap() {
 	app.useGlobalInterceptors(new LoggingInterceptor());
 
 	// Swagger configuration
-	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
+	if (swaggerEnabled) {
 		const config = new DocumentBuilder()
 			.setTitle('Whispr Scheduling Service API')
 			.setDescription('Task scheduling and orchestration service')
@@ -125,7 +146,7 @@ async function bootstrap() {
 	logger.log(`📊 Health check available at http://localhost:${port}/health`);
 	logger.log(`📈 Metrics available at http://localhost:${port}/api/v1/monitoring/metrics`);
 
-	if (configService.get('SWAGGER_ENABLED', 'true') === 'true') {
+	if (swaggerEnabled) {
 		logger.log(`📚 API Documentation available at http://localhost:${port}/swagger`);
 	}
 
