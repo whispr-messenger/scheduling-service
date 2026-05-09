@@ -2,6 +2,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 export enum ScheduledMessageStatus {
 	PENDING = 'pending',
+	// Etat intermediaire pose atomiquement avant d'envoyer le message.
+	// Empeche un autre pod de retraiter le meme enregistrement si notre lock
+	// Redis expire en cours de boucle (cf processDueMessages).
+	PROCESSING = 'processing',
 	SENT = 'sent',
 	CANCELLED = 'cancelled',
 	FAILED = 'failed',
