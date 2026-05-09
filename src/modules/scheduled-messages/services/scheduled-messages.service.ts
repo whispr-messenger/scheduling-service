@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual } from 'typeorm';
+import { Repository, In, LessThanOrEqual } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { ScheduledMessage, ScheduledMessageStatus } from '../entities/scheduled-message.entity';
@@ -14,6 +14,9 @@ import { buildRedisOptions } from '@/config/redis.config';
 
 const LOCK_KEY_PREFIX = 'scheduled-messages:lock:';
 const LOCK_TTL_SECONDS = 55;
+// Taille max d'un batch claim. Bornee pour eviter qu'un seul tick monopolise
+// la connexion DB et garder une latence d'envoi previsible.
+const PROCESS_BATCH_SIZE = 100;
 
 // Lua atomique : ne supprime la cle que si la valeur appartient a ce process.
 // Evite qu'un pod expire son lock et delete celui d'un autre pod.
@@ -166,21 +169,15 @@ export class ScheduledMessagesService {
 		}
 
 		try {
-			const dueMessages = await this.scheduledMessageRepository.find({
-				where: {
-					status: ScheduledMessageStatus.PENDING,
-					scheduledAt: LessThanOrEqual(new Date()),
-				},
-				order: { scheduledAt: 'ASC' },
-			});
+			const claimed = await this.claimDueMessages();
 
-			if (dueMessages.length === 0) {
+			if (claimed.length === 0) {
 				return;
 			}
 
-			this.logger.log(`Processing ${dueMessages.length} due scheduled message(s)`);
+			this.logger.log(`Processing ${claimed.length} due scheduled message(s)`);
 
-			for (const message of dueMessages) {
+			for (const message of claimed) {
 				await this.sendMessage(message);
 			}
 		} catch (error) {
@@ -191,6 +188,52 @@ export class ScheduledMessagesService {
 		} finally {
 			await this.releaseLock(lockKey);
 		}
+	}
+
+	/**
+	 * Claim atomique des messages dus :
+	 *  1. SELECT des IDs PENDING dont scheduledAt <= now (borne PROCESS_BATCH_SIZE).
+	 *  2. UPDATE ... SET status = PROCESSING WHERE id IN (...) AND status = PENDING
+	 *     RETURNING * — l'UPDATE pose un row-level lock cote PostgreSQL, donc deux
+	 *     pods ne peuvent pas claim le meme enregistrement.
+	 *
+	 * Si notre lock Redis expire en cours de boucle, le pod suivant ne verra plus
+	 * ces messages comme PENDING, donc ne les retraitera pas. Plus de double-send.
+	 */
+	private async claimDueMessages(): Promise<ScheduledMessage[]> {
+		const now = new Date();
+
+		const candidates = await this.scheduledMessageRepository.find({
+			where: {
+				status: ScheduledMessageStatus.PENDING,
+				scheduledAt: LessThanOrEqual(now),
+			},
+			order: { scheduledAt: 'ASC' },
+			take: PROCESS_BATCH_SIZE,
+			select: ['id'],
+		});
+
+		if (candidates.length === 0) {
+			return [];
+		}
+
+		const candidateIds = candidates.map((m) => m.id);
+
+		// UPDATE conditionne sur status=PENDING : si un autre process a deja claim
+		// la ligne, le predicat ne match plus et la ligne n'est pas retournee.
+		const claimResult = await this.scheduledMessageRepository
+			.createQueryBuilder()
+			.update(ScheduledMessage)
+			.set({ status: ScheduledMessageStatus.PROCESSING })
+			.where({
+				id: In(candidateIds),
+				status: ScheduledMessageStatus.PENDING,
+			})
+			.returning('*')
+			.execute();
+
+		const raw = (claimResult.raw ?? []) as ScheduledMessage[];
+		return this.scheduledMessageRepository.create(raw);
 	}
 
 	private async sendMessage(message: ScheduledMessage): Promise<void> {
