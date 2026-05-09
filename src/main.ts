@@ -24,7 +24,8 @@ async function bootstrap() {
 	// WHISPR-1348 : entêtes de sécurité HTTP (CSP, HSTS, X-Frame-Options, etc.)
 	// alignés sur auth-service / user-service / media-service. CSP désactivée
 	// quand Swagger est servi en non-prod pour ne pas bloquer le SwaggerUI inline.
-	const swaggerEnabled = configService.get('SWAGGER_ENABLED', 'true') === 'true';
+	// fail-closed: Swagger OFF par defaut, opt-in explicite via SWAGGER_ENABLED=true
+	const swaggerEnabled = configService.get('SWAGGER_ENABLED', 'false') === 'true';
 	app.use(
 		helmet({
 			contentSecurityPolicy: swaggerEnabled
@@ -41,8 +42,8 @@ async function bootstrap() {
 		})
 	);
 
-	// Enable CORS if configured
-	if (configService.get('CORS_ENABLED', 'true') === 'true') {
+	// fail-closed: CORS OFF par defaut, opt-in explicite via CORS_ENABLED=true
+	if (configService.get('CORS_ENABLED', 'false') === 'true') {
 		const rawOrigins = configService.get<string>('CORS_ALLOWED_ORIGINS', '');
 		const allowedOrigins = rawOrigins
 			.split(',')
