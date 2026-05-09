@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import { SchedulerService } from '@/modules/scheduler/services/scheduler.service';
 
 // concurrency env-driven pour scaler sous burst (default 1 sinon, queue grossit unboundedly)
-const PARSED_CONCURRENCY = parseInt(process.env.BULL_CONCURRENCY ?? '5', 10);
+const PARSED_CONCURRENCY = Number.parseInt(process.env.BULL_CONCURRENCY ?? '5', 10);
 const CONCURRENCY = Number.isFinite(PARSED_CONCURRENCY) ? Math.max(1, PARSED_CONCURRENCY) : 1;
 // maxStalledCount aligne avec attempts pour ne pas drop silencieusement les jobs OOM-killed
 const MAX_STALLED_COUNT = 5;
