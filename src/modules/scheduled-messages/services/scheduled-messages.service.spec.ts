@@ -382,6 +382,38 @@ describe('ScheduledMessagesService', () => {
 				expect(lastSave.retryCount).toBe(0);
 			});
 
+			it('erreur 404 (conversation supprimee) bascule en FAILED sans retry', async () => {
+				const claimed = buildClaimed({ retryCount: 0 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				const notFoundError = Object.assign(new Error('conversation not found'), {
+					response: { status: 404 },
+				});
+				messagingClient.sendScheduledMessage.mockRejectedValue(notFoundError);
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.FAILED);
+				expect(lastSave.retryCount).toBe(0);
+			});
+
+			it('erreur shape inconnue (fail-closed) bascule en FAILED sans retry', async () => {
+				const claimed = buildClaimed({ retryCount: 0 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				// Erreur sans code/status/response : doit etre traitee comme permanent.
+				messagingClient.sendScheduledMessage.mockRejectedValue(new Error('boom'));
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.FAILED);
+				expect(lastSave.retryCount).toBe(0);
+			});
+
 			it('3eme retry transient atteint le cap : status=FAILED', async () => {
 				const claimed = buildClaimed({ retryCount: 3 });
 				repository.find.mockResolvedValue([{ id: claimed.id }]);
