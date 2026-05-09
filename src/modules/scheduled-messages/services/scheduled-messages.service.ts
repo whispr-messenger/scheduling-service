@@ -28,7 +28,7 @@ export class ScheduledMessagesService {
 		this.redis = new Redis(buildRedisOptions(this.configService));
 	}
 
-	async create(dto: CreateScheduledMessageDto): Promise<ScheduledMessageResponseDto> {
+	async create(userId: string, dto: CreateScheduledMessageDto): Promise<ScheduledMessageResponseDto> {
 		const scheduledAt = new Date(dto.scheduledAt);
 
 		if (scheduledAt <= new Date()) {
@@ -36,7 +36,7 @@ export class ScheduledMessagesService {
 		}
 
 		const message = this.scheduledMessageRepository.create({
-			userId: dto.userId,
+			userId,
 			conversationId: dto.conversationId,
 			content: dto.content,
 			metadata: dto.metadata || null,
