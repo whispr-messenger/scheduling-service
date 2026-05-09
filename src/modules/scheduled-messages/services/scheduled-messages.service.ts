@@ -80,14 +80,7 @@ export class ScheduledMessagesService {
 	}
 
 	async findOne(id: string, userId: string): Promise<ScheduledMessageResponseDto> {
-		const message = await this.scheduledMessageRepository.findOne({
-			where: { id, userId },
-		});
-
-		if (!message) {
-			throw new NotFoundException(`Scheduled message with ID ${id} not found`);
-		}
-
+		const message = await this.findOwnedOrThrow(id, userId);
 		return this.toResponse(message);
 	}
 
@@ -96,13 +89,7 @@ export class ScheduledMessagesService {
 		userId: string,
 		dto: UpdateScheduledMessageDto
 	): Promise<ScheduledMessageResponseDto> {
-		const message = await this.scheduledMessageRepository.findOne({
-			where: { id, userId },
-		});
-
-		if (!message) {
-			throw new NotFoundException(`Scheduled message with ID ${id} not found`);
-		}
+		const message = await this.findOwnedOrThrow(id, userId);
 
 		if (message.status !== ScheduledMessageStatus.PENDING) {
 			throw new BadRequestException(
@@ -134,13 +121,7 @@ export class ScheduledMessagesService {
 	}
 
 	async cancel(id: string, userId: string): Promise<void> {
-		const message = await this.scheduledMessageRepository.findOne({
-			where: { id, userId },
-		});
-
-		if (!message) {
-			throw new NotFoundException(`Scheduled message with ID ${id} not found`);
-		}
+		const message = await this.findOwnedOrThrow(id, userId);
 
 		if (message.status !== ScheduledMessageStatus.PENDING) {
 			throw new BadRequestException(
@@ -152,6 +133,29 @@ export class ScheduledMessagesService {
 		await this.scheduledMessageRepository.save(message);
 
 		this.logger.log('Scheduled message cancelled', { id: message.id });
+	}
+
+	/**
+	 * Defense-in-depth : verifie l'ownership cote service, peu importe le transport.
+	 * Si demain ce service est appele par un handler gRPC ou un event listener qui
+	 * oublie de scoper, on n'expose pas une IDOR. Le predicat SQL { id, userId }
+	 * fait le boulot, et un userId vide est traite comme un not-found pour eviter
+	 * qu'un appelant sans contexte JWT ne puisse passer un id seul.
+	 */
+	private async findOwnedOrThrow(id: string, userId: string): Promise<ScheduledMessage> {
+		if (!userId) {
+			throw new NotFoundException(`Scheduled message with ID ${id} not found`);
+		}
+
+		const message = await this.scheduledMessageRepository.findOne({
+			where: { id, userId },
+		});
+
+		if (!message) {
+			throw new NotFoundException(`Scheduled message with ID ${id} not found`);
+		}
+
+		return message;
 	}
 
 	/**

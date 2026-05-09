@@ -172,6 +172,21 @@ describe('ScheduledMessagesService', () => {
 				where: { id: 'msg-id', userId: 'user-A' },
 			});
 		});
+
+		it('un autre userId que le proprietaire recoit NotFoundException (pas de leak owner)', async () => {
+			// le repo renvoie null car la query { id, userId=attaquant } ne match aucune ligne
+			repository.findOne.mockResolvedValue(null);
+			await expect(service.findOne('msg-owned-by-bob', 'attacker-id')).rejects.toThrow('not found');
+			expect(repository.findOne).toHaveBeenCalledWith({
+				where: { id: 'msg-owned-by-bob', userId: 'attacker-id' },
+			});
+		});
+
+		it('userId vide est rejete avant la query DB (defense-in-depth contre transport sans JWT)', async () => {
+			await expect(service.update('msg-id', '', { content: 'x' })).rejects.toThrow('not found');
+			// la query DB ne doit jamais etre lancee si le caller n'a pas de userId
+			expect(repository.findOne).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('processDueMessages — Redis lock', () => {
