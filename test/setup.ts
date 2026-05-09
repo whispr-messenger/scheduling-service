@@ -29,6 +29,7 @@ jest.mock('@nestjs/bullmq', () => ({
 	getQueueToken: jest.fn((name: string) => `BullQueue_${name}`),
 	InjectQueue: jest.fn(() => jest.fn()),
 	Processor: jest.fn(() => jest.fn()),
+	OnWorkerEvent: jest.fn(() => jest.fn()),
 	WorkerHost: class MockWorkerHost {},
 }));
 
