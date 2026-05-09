@@ -1,9 +1,15 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { SchedulerService } from '@/modules/scheduler/services/scheduler.service';
 
-@Processor('high-priority')
+// concurrency env-driven pour scaler sous burst (default 1 sinon, queue grossit unboundedly)
+const PARSED_CONCURRENCY = parseInt(process.env.BULL_CONCURRENCY ?? '5', 10);
+const CONCURRENCY = Number.isFinite(PARSED_CONCURRENCY) ? Math.max(1, PARSED_CONCURRENCY) : 1;
+// maxStalledCount aligne avec attempts pour ne pas drop silencieusement les jobs OOM-killed
+const MAX_STALLED_COUNT = 5;
+
+@Processor('high-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
 export class HighPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(HighPriorityJobProcessor.name);
 
@@ -44,9 +50,19 @@ export class HighPriorityJobProcessor extends WorkerHost {
 			throw error;
 		}
 	}
+
+	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
+	@OnWorkerEvent('failed')
+	onFailed(job: Job, err: Error): void {
+		this.logger.warn('High priority worker failed event', {
+			bullJobId: job?.id,
+			attemptsMade: job?.attemptsMade,
+			error: err?.message,
+		});
+	}
 }
 
-@Processor('medium-priority')
+@Processor('medium-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
 export class MediumPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(MediumPriorityJobProcessor.name);
 
@@ -87,9 +103,19 @@ export class MediumPriorityJobProcessor extends WorkerHost {
 			throw error;
 		}
 	}
+
+	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
+	@OnWorkerEvent('failed')
+	onFailed(job: Job, err: Error): void {
+		this.logger.warn('Medium priority worker failed event', {
+			bullJobId: job?.id,
+			attemptsMade: job?.attemptsMade,
+			error: err?.message,
+		});
+	}
 }
 
-@Processor('low-priority')
+@Processor('low-priority', { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT })
 export class LowPriorityJobProcessor extends WorkerHost {
 	private readonly logger = new Logger(LowPriorityJobProcessor.name);
 
@@ -129,5 +155,15 @@ export class LowPriorityJobProcessor extends WorkerHost {
 			});
 			throw error;
 		}
+	}
+
+	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
+	@OnWorkerEvent('failed')
+	onFailed(job: Job, err: Error): void {
+		this.logger.warn('Low priority worker failed event', {
+			bullJobId: job?.id,
+			attemptsMade: job?.attemptsMade,
+			error: err?.message,
+		});
 	}
 }
