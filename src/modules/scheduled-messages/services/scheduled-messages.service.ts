@@ -311,13 +311,12 @@ export class ScheduledMessagesService {
 	/**
 	 * Heuristique pour distinguer une erreur transiente d'une erreur permanente.
 	 * Transient : timeout, 5xx, ECONNREFUSED, ECONNRESET, gRPC UNAVAILABLE, etc.
-	 * Permanent : 4xx (hors 408/429), validation, user inconnu.
-	 * Si on ne reconnait pas le format, on prend le parti prudent du "transient"
-	 * pour ne pas perdre silencieusement un message sur une exception inhabituelle.
+	 * Permanent : 4xx (404 conversation deleted, 410 gone, validation, user inconnu).
+	 * fail-closed: shape inconnue = traiter comme permanent (eviter retry storm).
 	 */
 	private isTransientError(error: unknown): boolean {
 		if (!error || typeof error !== 'object') {
-			return true;
+			return false;
 		}
 
 		const err = error as {
@@ -340,6 +339,10 @@ export class ScheduledMessagesService {
 		// HTTP status (axios met response.status, certains clients mettent status/statusCode).
 		const httpStatus = err.response?.status ?? err.status ?? err.statusCode;
 		if (typeof httpStatus === 'number') {
+			// 404 conversation deleted / 410 gone : permanent explicite, jamais retry.
+			if (httpStatus === 404 || httpStatus === 410) {
+				return false;
+			}
 			if (TRANSIENT_HTTP_STATUS.has(httpStatus)) {
 				return true;
 			}
@@ -354,8 +357,8 @@ export class ScheduledMessagesService {
 			}
 		}
 
-		// Format inconnu : on tolere un retry plutot que de perdre le message.
-		return true;
+		// fail-closed: shape inconnue = traiter comme permanent (eviter retry storm).
+		return false;
 	}
 
 	/**
