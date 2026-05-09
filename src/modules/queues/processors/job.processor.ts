@@ -12,155 +12,74 @@ const MAX_STALLED_COUNT = 5;
 // options worker partagees par les trois processors (concurrency + maxStalledCount)
 const WORKER_OPTS = { concurrency: CONCURRENCY, maxStalledCount: MAX_STALLED_COUNT };
 
-// helper alerting commun : log warn-level pour Sonar/Loki sur job echoue apres tous les retries
-function logFailedEvent(logger: Logger, label: string, job: Job, err: Error): void {
-	logger.warn(`${label} worker failed event`, {
-		bullJobId: job?.id,
-		attemptsMade: job?.attemptsMade,
-		error: err?.message,
-	});
+// base partagee par les processors high/medium/low : meme flow d'execution, seul le label change
+abstract class BaseJobProcessor extends WorkerHost {
+	protected abstract readonly priorityLabel: string;
+	protected abstract readonly logger: Logger;
+
+	constructor(private readonly schedulerService: SchedulerService) {
+		super();
+	}
+
+	async process(job: Job): Promise<any> {
+		// on ne traite que les jobs nommes 'execute-job'
+		if (job.name !== 'execute-job') {
+			return;
+		}
+
+		const { jobId, scheduleId } = job.data;
+
+		this.logger.log(`Processing ${this.priorityLabel} priority job`, {
+			jobId,
+			scheduleId,
+			bullJobId: job.id,
+		});
+
+		try {
+			const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
+
+			this.logger.log(`${this.priorityLabel} priority job completed`, {
+				jobId,
+				executionId: result.id,
+				status: result.status,
+			});
+
+			return result;
+		} catch (error) {
+			this.logger.error(`${this.priorityLabel} priority job failed`, {
+				jobId,
+				scheduleId,
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
+	// listener visible Sonar/Loki si un job echoue apres tous les retries (alerting)
+	@OnWorkerEvent('failed')
+	onFailed(job: Job, err: Error): void {
+		this.logger.warn(`${this.priorityLabel} priority worker failed event`, {
+			bullJobId: job?.id,
+			attemptsMade: job?.attemptsMade,
+			error: err?.message,
+		});
+	}
 }
 
 @Processor('high-priority', WORKER_OPTS)
-export class HighPriorityJobProcessor extends WorkerHost {
-	private readonly logger = new Logger(HighPriorityJobProcessor.name);
-
-	constructor(private schedulerService: SchedulerService) {
-		super();
-	}
-
-	async process(job: Job): Promise<any> {
-		// Only process 'execute-job' jobs
-		if (job.name !== 'execute-job') {
-			return;
-		}
-
-		const { jobId, scheduleId } = job.data;
-
-		this.logger.log('Processing high priority job', {
-			jobId,
-			scheduleId,
-			bullJobId: job.id,
-		});
-
-		try {
-			const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
-
-			this.logger.log('High priority job completed', {
-				jobId,
-				executionId: result.id,
-				status: result.status,
-			});
-
-			return result;
-		} catch (error) {
-			this.logger.error('High priority job failed', {
-				jobId,
-				scheduleId,
-				error: error.message,
-			});
-			throw error;
-		}
-	}
-
-	@OnWorkerEvent('failed')
-	onFailed(job: Job, err: Error): void {
-		logFailedEvent(this.logger, 'High priority', job, err);
-	}
+export class HighPriorityJobProcessor extends BaseJobProcessor {
+	protected readonly priorityLabel = 'High';
+	protected readonly logger = new Logger(HighPriorityJobProcessor.name);
 }
 
 @Processor('medium-priority', WORKER_OPTS)
-export class MediumPriorityJobProcessor extends WorkerHost {
-	private readonly logger = new Logger(MediumPriorityJobProcessor.name);
-
-	constructor(private schedulerService: SchedulerService) {
-		super();
-	}
-
-	async process(job: Job): Promise<any> {
-		// Only process 'execute-job' jobs
-		if (job.name !== 'execute-job') {
-			return;
-		}
-
-		const { jobId, scheduleId } = job.data;
-
-		this.logger.log('Processing medium priority job', {
-			jobId,
-			scheduleId,
-			bullJobId: job.id,
-		});
-
-		try {
-			const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
-
-			this.logger.log('Medium priority job completed', {
-				jobId,
-				executionId: result.id,
-				status: result.status,
-			});
-
-			return result;
-		} catch (error) {
-			this.logger.error('Medium priority job failed', {
-				jobId,
-				scheduleId,
-				error: error.message,
-			});
-			throw error;
-		}
-	}
-
-	@OnWorkerEvent('failed')
-	onFailed(job: Job, err: Error): void {
-		logFailedEvent(this.logger, 'Medium priority', job, err);
-	}
+export class MediumPriorityJobProcessor extends BaseJobProcessor {
+	protected readonly priorityLabel = 'Medium';
+	protected readonly logger = new Logger(MediumPriorityJobProcessor.name);
 }
 
 @Processor('low-priority', WORKER_OPTS)
-export class LowPriorityJobProcessor extends WorkerHost {
-	private readonly logger = new Logger(LowPriorityJobProcessor.name);
-
-	constructor(private schedulerService: SchedulerService) {
-		super();
-	}
-
-	async process(job: Job): Promise<any> {
-		// Only process 'execute-job' jobs
-		if (job.name !== 'execute-job') {
-			return;
-		}
-
-		const { jobId, scheduleId } = job.data;
-
-		this.logger.log('Processing low priority job', {
-			jobId,
-			scheduleId,
-			bullJobId: job.id,
-		});
-
-		try {
-			const result = await this.schedulerService.executeJob(jobId, scheduleId, `bull-${job.id}`);
-
-			this.logger.log('Low priority job completed', {
-				jobId,
-				executionId: result.id,
-				status: result.status,
-			});
-
-			return result;
-		} catch (error) {
-			this.logger.error('Low priority job failed', {
-				jobId,
-				scheduleId,
-				error: error.message,
-			});
-			throw error;
-		}
-	}
-
-	@OnWorkerEvent('failed')
-	onFailed(job: Job, err: Error): void {
-		logFailedEvent(this.logger, 'Low priority', job, err);
-	}
+export class LowPriorityJobProcessor extends BaseJobProcessor {
+	protected readonly priorityLabel = 'Low';
+	protected readonly logger = new Logger(LowPriorityJobProcessor.name);
 }
