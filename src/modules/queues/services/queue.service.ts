@@ -216,18 +216,22 @@ export class QueueService {
 		const queue = this.getQueue(queueName);
 		const failedJobs = await queue.getFailed();
 
-		let retriedCount = 0;
-		for (const job of failedJobs) {
-			try {
-				await job.retry();
-				retriedCount++;
-			} catch (error) {
-				this.logger.warn('Failed to retry job', {
-					jobId: job.id,
-					error: error.message,
-				});
-			}
-		}
+		const results = await Promise.all(
+			failedJobs.map(async (job) => {
+				try {
+					await job.retry();
+					return true;
+				} catch (error) {
+					this.logger.warn('Failed to retry job', {
+						jobId: job.id,
+						error: error.message,
+					});
+					return false;
+				}
+			})
+		);
+
+		const retriedCount = results.filter(Boolean).length;
 
 		this.logger.log('Failed jobs retried', {
 			queueName,
