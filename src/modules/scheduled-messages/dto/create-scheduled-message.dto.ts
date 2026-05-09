@@ -3,14 +3,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateScheduledMessageDto {
 	@ApiProperty({
-		description: 'ID of the user scheduling the message',
-		example: 'a1b2c3d4-5678-9abc-def0-123456789abc',
-	})
-	@IsUUID()
-	@IsNotEmpty()
-	userId: string;
-
-	@ApiProperty({
 		description: 'ID of the conversation to send the message to',
 		example: 'b2c3d4e5-6789-abcd-ef01-23456789abcd',
 	})
