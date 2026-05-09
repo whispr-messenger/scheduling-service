@@ -125,6 +125,27 @@ describe('ScheduledMessagesService', () => {
 				})
 			).rejects.toThrow('scheduled_at must be in the future');
 		});
+
+		it('preserve l instant absolu UTC pour un offset Paris ete (+02:00)', async () => {
+			// 09:00 Paris ete = 07:00 UTC. Le service doit persister 07:00Z.
+			// L'horizon doit etre largement futur pour ne pas declencher la
+			// validation "date passee" peu importe le moment d'execution du test.
+			const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+			const yyyy = farFuture.getUTCFullYear();
+			const mm = String(farFuture.getUTCMonth() + 1).padStart(2, '0');
+			const dd = String(farFuture.getUTCDate()).padStart(2, '0');
+			const scheduledAt = `${yyyy}-${mm}-${dd}T09:00:00+02:00`;
+
+			await service.create('uid', {
+				conversationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+				content: 'hello',
+				scheduledAt,
+			});
+
+			const persistedDate = repository.create.mock.calls[0][0].scheduledAt as Date;
+			expect(persistedDate.getUTCHours()).toBe(7);
+			expect(persistedDate.getUTCMinutes()).toBe(0);
+		});
 	});
 
 	describe('findOne / update / cancel — scoping par userId', () => {

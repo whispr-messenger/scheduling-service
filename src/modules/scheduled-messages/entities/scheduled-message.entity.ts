@@ -31,7 +31,10 @@ export class ScheduledMessage {
 	@Column({ type: 'jsonb', nullable: true, default: null })
 	metadata: Record<string, any> | null;
 
-	@Column({ type: 'timestamp', name: 'scheduled_at' })
+	// timestamptz : on stocke l'instant absolu UTC. Le DTO impose un offset
+	// timezone explicite cote API (cf is-iso8601-with-offset.decorator), donc
+	// `new Date(dto.scheduledAt)` produit toujours le bon instant.
+	@Column({ type: 'timestamptz', name: 'scheduled_at' })
 	scheduledAt: Date;
 
 	@Column({
@@ -41,9 +44,9 @@ export class ScheduledMessage {
 	})
 	status: ScheduledMessageStatus;
 
-	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
+	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
 	createdAt: Date;
 
-	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
 	updatedAt: Date;
 }
