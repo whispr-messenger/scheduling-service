@@ -17,6 +17,24 @@ const LOCK_TTL_SECONDS = 55;
 // Taille max d'un batch claim. Bornee pour eviter qu'un seul tick monopolise
 // la connexion DB et garder une latence d'envoi previsible.
 const PROCESS_BATCH_SIZE = 100;
+// Plafond de retry sur erreur transiente avant de basculer en FAILED definitif.
+// 3 tentatives = ~3 minutes de tolerance (cron par minute), suffisant pour
+// absorber un redeploiement messaging-service ou une coupure reseau breve.
+const RETRY_LIMIT = 3;
+// Codes HTTP consideres comme transients (le retry a une chance de reussir).
+// 408 timeout, 429 throttling, 503 unavailable, 504 gateway timeout.
+const TRANSIENT_HTTP_STATUS = new Set([408, 429, 502, 503, 504]);
+// Codes erreur reseau Node consideres comme transients.
+const TRANSIENT_NETWORK_CODES = new Set([
+	'ECONNREFUSED',
+	'ECONNRESET',
+	'ETIMEDOUT',
+	'EAI_AGAIN',
+	'ENOTFOUND',
+	'EPIPE',
+]);
+// Codes gRPC transients : UNAVAILABLE, DEADLINE_EXCEEDED, RESOURCE_EXHAUSTED, ABORTED.
+const TRANSIENT_GRPC_CODES = new Set([4, 8, 10, 14]);
 
 // Lua atomique : ne supprime la cle que si la valeur appartient a ce process.
 // Evite qu'un pod expire son lock et delete celui d'un autre pod.
@@ -259,14 +277,85 @@ export class ScheduledMessagesService {
 				conversationId: message.conversationId,
 			});
 		} catch (error) {
+			const transient = this.isTransientError(error);
+			const canRetry = transient && message.retryCount < RETRY_LIMIT;
+
+			if (canRetry) {
+				// On ramene le message en PENDING pour que le prochain tick
+				// le re-claim. Increment du compteur pour cap les retries.
+				message.retryCount += 1;
+				message.status = ScheduledMessageStatus.PENDING;
+				await this.scheduledMessageRepository.save(message);
+
+				this.logger.warn('Scheduled message send failed (transient), will retry', {
+					id: message.id,
+					retryCount: message.retryCount,
+					retryLimit: RETRY_LIMIT,
+					error: error.message,
+				});
+				return;
+			}
+
 			message.status = ScheduledMessageStatus.FAILED;
 			await this.scheduledMessageRepository.save(message);
 
 			this.logger.error('Failed to send scheduled message', {
 				id: message.id,
+				retryCount: message.retryCount,
+				transient,
 				error: error.message,
 			});
 		}
+	}
+
+	/**
+	 * Heuristique pour distinguer une erreur transiente d'une erreur permanente.
+	 * Transient : timeout, 5xx, ECONNREFUSED, ECONNRESET, gRPC UNAVAILABLE, etc.
+	 * Permanent : 4xx (hors 408/429), validation, user inconnu.
+	 * Si on ne reconnait pas le format, on prend le parti prudent du "transient"
+	 * pour ne pas perdre silencieusement un message sur une exception inhabituelle.
+	 */
+	private isTransientError(error: unknown): boolean {
+		if (!error || typeof error !== 'object') {
+			return true;
+		}
+
+		const err = error as {
+			code?: string | number;
+			status?: number;
+			statusCode?: number;
+			response?: { status?: number };
+		};
+
+		// Erreur reseau Node (ECONNREFUSED, ECONNRESET, ETIMEDOUT...).
+		if (typeof err.code === 'string' && TRANSIENT_NETWORK_CODES.has(err.code)) {
+			return true;
+		}
+
+		// gRPC status code numerique.
+		if (typeof err.code === 'number' && TRANSIENT_GRPC_CODES.has(err.code)) {
+			return true;
+		}
+
+		// HTTP status (axios met response.status, certains clients mettent status/statusCode).
+		const httpStatus = err.response?.status ?? err.status ?? err.statusCode;
+		if (typeof httpStatus === 'number') {
+			if (TRANSIENT_HTTP_STATUS.has(httpStatus)) {
+				return true;
+			}
+			// 4xx (hors transients deja matches) = permanent : payload invalide,
+			// user inconnu, droits manquants — un retry n'aidera pas.
+			if (httpStatus >= 400 && httpStatus < 500) {
+				return false;
+			}
+			// 5xx restant : transient par defaut.
+			if (httpStatus >= 500) {
+				return true;
+			}
+		}
+
+		// Format inconnu : on tolere un retry plutot que de perdre le message.
+		return true;
 	}
 
 	/**

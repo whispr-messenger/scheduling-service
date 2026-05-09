@@ -307,6 +307,112 @@ describe('ScheduledMessagesService', () => {
 			expect(messagingClient.sendScheduledMessage).not.toHaveBeenCalled();
 		});
 
+		describe('sendMessage — retry sur erreur transiente', () => {
+			// Construit un message PENDING fake, dejà claim par claimDueMessages
+			// (donc en PROCESSING avec retryCount=initial).
+			const buildClaimed = (overrides: Partial<ScheduledMessage> = {}): ScheduledMessage =>
+				({
+					id: 'msg-retry',
+					userId: 'u',
+					conversationId: 'c',
+					content: 'hello',
+					metadata: null,
+					scheduledAt: new Date(Date.now() - 1000),
+					status: ScheduledMessageStatus.PROCESSING,
+					retryCount: 0,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					...overrides,
+				}) as ScheduledMessage;
+
+			beforeEach(() => {
+				redisMock.set.mockResolvedValue('OK');
+				redisMock.runScript.mockResolvedValue(1);
+			});
+
+			it('erreur transiente (ECONNREFUSED) repasse status=PENDING + increment retry_count', async () => {
+				const claimed = buildClaimed({ retryCount: 0 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				const transientError = Object.assign(new Error('connection refused'), {
+					code: 'ECONNREFUSED',
+				});
+				messagingClient.sendScheduledMessage.mockRejectedValue(transientError);
+
+				await service.processDueMessages();
+
+				const savedStates = repository.save.mock.calls.map((call) => call[0]);
+				const lastSave = savedStates[savedStates.length - 1];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.PENDING);
+				expect(lastSave.retryCount).toBe(1);
+			});
+
+			it('erreur 503 (transiente) repasse en PENDING avec retryCount+1', async () => {
+				const claimed = buildClaimed({ retryCount: 1 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				const httpError = Object.assign(new Error('service unavailable'), {
+					response: { status: 503 },
+				});
+				messagingClient.sendScheduledMessage.mockRejectedValue(httpError);
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.PENDING);
+				expect(lastSave.retryCount).toBe(2);
+			});
+
+			it('erreur 400 (permanente) bascule directement en FAILED sans retry', async () => {
+				const claimed = buildClaimed({ retryCount: 0 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				const validationError = Object.assign(new Error('invalid payload'), {
+					response: { status: 400 },
+				});
+				messagingClient.sendScheduledMessage.mockRejectedValue(validationError);
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.FAILED);
+				expect(lastSave.retryCount).toBe(0);
+			});
+
+			it('3eme retry transient atteint le cap : status=FAILED', async () => {
+				const claimed = buildClaimed({ retryCount: 3 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+
+				const transientError = Object.assign(new Error('reset'), {
+					code: 'ECONNRESET',
+				});
+				messagingClient.sendScheduledMessage.mockRejectedValue(transientError);
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.FAILED);
+				expect(lastSave.retryCount).toBe(3);
+			});
+
+			it('succes apres claim : status=SENT, pas de bump retry_count', async () => {
+				const claimed = buildClaimed({ retryCount: 1 });
+				repository.find.mockResolvedValue([{ id: claimed.id }]);
+				queryBuilder.execute.mockResolvedValue({ raw: [claimed] });
+				messagingClient.sendScheduledMessage.mockResolvedValue({ ok: true });
+
+				await service.processDueMessages();
+
+				const lastSave = repository.save.mock.calls.at(-1)?.[0];
+				expect(lastSave.status).toBe(ScheduledMessageStatus.SENT);
+				expect(lastSave.retryCount).toBe(1);
+			});
+		});
+
 		it('deux instances ont des owner IDs distincts (cas multi-pod)', async () => {
 			redisMock.set.mockResolvedValue('OK');
 			redisMock.runScript.mockResolvedValue(1);
