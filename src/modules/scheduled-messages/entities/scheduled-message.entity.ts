@@ -44,6 +44,12 @@ export class ScheduledMessage {
 	})
 	status: ScheduledMessageStatus;
 
+	// Compteur d'echecs transients (timeout, 5xx, ECONNREFUSED, etc).
+	// Au dela de RETRY_LIMIT, le message bascule en FAILED definitif.
+	// Une erreur permanente (4xx hors 408/429/503/504) court-circuite ce compteur.
+	@Column({ type: 'int', name: 'retry_count', default: 0 })
+	retryCount: number;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
 	createdAt: Date;
 
