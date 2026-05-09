@@ -21,10 +21,11 @@ export class JobResponseDto {
 	description?: string;
 
 	@ApiProperty({
-		description: 'Category ID',
+		description: 'Category ID (null si la categorie a ete supprimee)',
 		example: 'e7f8a9b0-1234-5678-9abc-def012345678',
+		nullable: true,
 	})
-	categoryId: string;
+	categoryId: string | null;
 
 	@ApiProperty({
 		description: 'Target service',
