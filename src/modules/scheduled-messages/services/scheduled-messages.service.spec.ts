@@ -126,6 +126,29 @@ describe('ScheduledMessagesService', () => {
 			).rejects.toThrow('scheduled_at must be in the future');
 		});
 
+		it('refuse une date a plus de 1 an dans le futur', async () => {
+			const tooFar = new Date(Date.now() + 366 * 24 * 60 * 60 * 1000).toISOString();
+			await expect(
+				service.create('uid', {
+					conversationId: 'cid',
+					content: 'x',
+					scheduledAt: tooFar,
+				})
+			).rejects.toThrow('within 1 year');
+		});
+
+		it('accepte une date exactement dans 365 jours', async () => {
+			// Doit passer : horizon = maintenant + 365 jours, c'est < 365j+1ms.
+			const okDate = new Date(Date.now() + 364 * 24 * 60 * 60 * 1000).toISOString();
+			await expect(
+				service.create('uid', {
+					conversationId: 'cid',
+					content: 'x',
+					scheduledAt: okDate,
+				})
+			).resolves.toBeDefined();
+		});
+
 		it('preserve l instant absolu UTC pour un offset Paris ete (+02:00)', async () => {
 			// 09:00 Paris ete = 07:00 UTC. Le service doit persister 07:00Z.
 			// L'horizon doit etre largement futur pour ne pas declencher la
@@ -186,6 +209,18 @@ describe('ScheduledMessagesService', () => {
 			await expect(service.update('msg-id', '', { content: 'x' })).rejects.toThrow('not found');
 			// la query DB ne doit jamais etre lancee si le caller n'a pas de userId
 			expect(repository.findOne).not.toHaveBeenCalled();
+		});
+
+		it('update refuse scheduledAt a plus de 1 an dans le futur', async () => {
+			repository.findOne.mockResolvedValue({
+				id: 'msg-id',
+				userId: 'user-A',
+				status: ScheduledMessageStatus.PENDING,
+			});
+			const tooFar = new Date(Date.now() + 366 * 24 * 60 * 60 * 1000).toISOString();
+			await expect(service.update('msg-id', 'user-A', { scheduledAt: tooFar })).rejects.toThrow(
+				'within 1 year'
+			);
 		});
 	});
 
