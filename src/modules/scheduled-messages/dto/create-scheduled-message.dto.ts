@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsObject, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsISO8601WithOffset } from '@/common/decorators/is-iso8601-with-offset.decorator';
 
@@ -14,9 +14,11 @@ export class CreateScheduledMessageDto {
 	@ApiProperty({
 		description: 'Message content',
 		example: 'Hello, this is a scheduled message!',
+		maxLength: 4000,
 	})
 	@IsString()
 	@IsNotEmpty()
+	@MaxLength(4000)
 	content: string;
 
 	@ApiPropertyOptional({

@@ -42,6 +42,9 @@ beforeAll(async () => {
 	// HMAC secret for webhook signing - required by WebhookHmacService
 	process.env.WEBHOOK_HMAC_SECRET =
 		process.env.WEBHOOK_HMAC_SECRET || 'test-webhook-secret-e2e-placeholder'; // NOSONAR - test environment default
+
+	// Token partagé inter-services pour les routes internes /api/v1/jobs
+	process.env.INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || 'test-internal-secret'; // NOSONAR - test environment default
 });
 
 // Global E2E teardown
