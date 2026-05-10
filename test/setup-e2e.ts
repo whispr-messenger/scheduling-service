@@ -1,10 +1,24 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Test } from '@nestjs/testing';
 
+jest.mock('@nest-lab/throttler-storage-redis', () => {
+	const ThrottlerStorageRedisService = jest.fn().mockImplementation(() => ({
+		increment: jest.fn().mockResolvedValue({
+			totalHits: 1,
+			timeToExpire: 60000,
+			isBlocked: false,
+			timeToBlockExpire: 0,
+		}),
+		onModuleDestroy: jest.fn(),
+	}));
+	return { ThrottlerStorageRedisService };
+});
+
 // E2E test setup
 beforeAll(async () => {
 	process.env.NODE_ENV = 'test';
 	process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+	process.env.JWT_JWKS_URL = process.env.JWT_JWKS_URL || 'http://localhost:9999/.well-known/jwks.json';
 	process.env.GRPC_PORT = process.env.GRPC_PORT || '50053';
 
 	// Database — use env vars if provided, otherwise fall back to k3d dev defaults
@@ -19,8 +33,18 @@ beforeAll(async () => {
 	// Redis
 	process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 	process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
-	process.env.REDIS_PASSWORD = process.env.REDIS_PASSWORD || 'whispr_dev_password'; // NOSONAR - test environment default, not a real credential
+	// Use nullish check so an explicitly empty REDIS_PASSWORD (passwordless CI redis) is preserved.
+	if (process.env.REDIS_PASSWORD === undefined) {
+		process.env.REDIS_PASSWORD = 'whispr_dev_password'; // NOSONAR - test environment default, not a real credential
+	}
 	process.env.REDIS_DB = process.env.REDIS_DB || '4';
+
+	// HMAC secret for webhook signing - required by WebhookHmacService
+	process.env.WEBHOOK_HMAC_SECRET =
+		process.env.WEBHOOK_HMAC_SECRET || 'test-webhook-secret-e2e-placeholder'; // NOSONAR - test environment default
+
+	// Token partagé inter-services pour les routes internes /api/v1/jobs
+	process.env.INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || 'test-internal-secret'; // NOSONAR - test environment default
 });
 
 // Global E2E teardown
