@@ -14,6 +14,9 @@ import { buildRedisOptions } from '@/config/redis.config';
 
 const LOCK_KEY_PREFIX = 'scheduled-messages:lock:';
 const LOCK_TTL_SECONDS = 55;
+// Horizon max d'un message programme : 1 an. Au-dela on refuse pour eviter
+// des enregistrements fantomes et des abus de stockage.
+const MAX_SCHEDULE_HORIZON_MS = 365 * 24 * 60 * 60 * 1000;
 // Taille max d'un batch claim. Bornee pour eviter qu'un seul tick monopolise
 // la connexion DB et garder une latence d'envoi previsible.
 const PROCESS_BATCH_SIZE = 100;
@@ -63,9 +66,14 @@ export class ScheduledMessagesService {
 
 	async create(userId: string, dto: CreateScheduledMessageDto): Promise<ScheduledMessageResponseDto> {
 		const scheduledAt = new Date(dto.scheduledAt);
+		const now = new Date();
 
-		if (scheduledAt <= new Date()) {
+		if (scheduledAt <= now) {
 			throw new BadRequestException('scheduled_at must be in the future');
+		}
+
+		if (scheduledAt.getTime() - now.getTime() > MAX_SCHEDULE_HORIZON_MS) {
+			throw new BadRequestException('scheduled_at must be within 1 year from now');
 		}
 
 		const message = this.scheduledMessageRepository.create({
@@ -117,8 +125,12 @@ export class ScheduledMessagesService {
 
 		if (dto.scheduledAt) {
 			const newScheduledAt = new Date(dto.scheduledAt);
-			if (newScheduledAt <= new Date()) {
+			const now = new Date();
+			if (newScheduledAt <= now) {
 				throw new BadRequestException('scheduled_at must be in the future');
+			}
+			if (newScheduledAt.getTime() - now.getTime() > MAX_SCHEDULE_HORIZON_MS) {
+				throw new BadRequestException('scheduled_at must be within 1 year from now');
 			}
 			message.scheduledAt = newScheduledAt;
 		}
