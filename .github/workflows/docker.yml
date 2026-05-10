@@ -133,9 +133,14 @@ jobs:
             exit 1
           fi
 
+      # Sigstore Rekor tlog uploads occasionally time out and are not
+      # required for the image to be deployable. Treat both attestation
+      # steps as best-effort so transient sigstore.dev outages do not
+      # block the build pipeline.
       - name: Attest SBOM to image
         if: inputs.should_deploy == true
         uses: actions/attest-sbom@21f269c03431211cf2de4a1b5d90001746539dc9 # v1
+        continue-on-error: true
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
@@ -145,6 +150,7 @@ jobs:
       - name: Generate provenance attestation
         if: inputs.should_deploy == true
         uses: actions/attest-build-provenance@92c65d2898f1f53cfdc910b962cecff86e7f8fcc # v1
+        continue-on-error: true
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
