@@ -11,6 +11,10 @@ import { ScheduledMessage } from '../scheduled-messages/entities/scheduled-messa
 import { DataSourceOptions } from 'typeorm';
 import { InitialSchema1743070800000 } from './migrations/1743070800000-InitialSchema';
 import { AddScheduledMessages1743070800001 } from './migrations/1743070800001-AddScheduledMessages';
+import { AddProcessingStatusScheduledMessages1746790000000 } from './migrations/1746790000000-AddProcessingStatusScheduledMessages';
+import { AlterScheduledMessagesTimestamptz1746830000000 } from './migrations/1746830000000-AlterScheduledMessagesTimestamptz';
+import { JobsCategoryFkSetNull1746900000000 } from './migrations/1746900000000-JobsCategoryFkSetNull';
+import { AddRetryCountScheduledMessages1746950000000 } from './migrations/1746950000000-AddRetryCountScheduledMessages';
 
 // Register new TypeORM entities here
 const ENTITIES = [
@@ -71,8 +75,16 @@ function getDataSourceOptions(configService: ConfigService): DataSourceOptions {
 		// Indicates if logging is enabled or not. If set to true then query and error logging will be enabled.
 		logging: configService.get('DB_LOGGING', 'false') === 'true',
 		// Migrations to be loaded and used for this data source
-		// Explicit path (no glob) avoids DirectoryExportedClassesLoader infinite recursion (stack overflow)
-		migrations: [InitialSchema1743070800000, AddScheduledMessages1743070800001],
+		// Explicit class list (no glob) avoids DirectoryExportedClassesLoader infinite recursion (stack overflow)
+		// Add any new migration class here so it runs at boot when DB_MIGRATIONS_RUN=true
+		migrations: [
+			InitialSchema1743070800000,
+			AddScheduledMessages1743070800001,
+			AddProcessingStatusScheduledMessages1746790000000,
+			AlterScheduledMessagesTimestamptz1746830000000,
+			JobsCategoryFkSetNull1746900000000,
+			AddRetryCountScheduledMessages1746950000000,
+		],
 		// Indicates if migrations should be auto-run on every application launch.
 		migrationsRun: configService.get('DB_MIGRATIONS_RUN', 'false') === 'true',
 		// Indicates if database schema should be auto created on every application launch.
