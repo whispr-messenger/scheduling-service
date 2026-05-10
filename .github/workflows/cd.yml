@@ -1,6 +1,9 @@
 name: CD Pipeline
 
 on:
+  # workflow_run runs in the base repo's context with access to secrets. The
+  # job-level if and step-level if checks below filter on
+  # workflow_run.head_repository.fork == false to never run untrusted fork code.
   workflow_run:
     workflows: [🚀 CI Pipeline]
     types: [completed]
@@ -18,32 +21,48 @@ env:
 
 jobs:
   update-deployment:
-    if: ${{ github.event.workflow_run.event == 'push' || github.event_name == 'workflow_dispatch' }}
+    # Only run for trusted events: push from this repo or manual dispatch.
+    # workflow_run.head_repository.fork tells us if the upstream CI was triggered by a fork.
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.event == 'push' &&
+         github.event.workflow_run.head_repository.fork == false)
+      }}
     runs-on: ubuntu-latest
     name: Update Deployment Manifest
 
     permissions:
-      contents: write
+      contents: read
       packages: read
 
     steps:
       - name: Generate GitHub App Token
         id: generate_token
-        uses: tibdex/github-app-token@v2
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2
         with:
           app_id: ${{ secrets.ACTIONS_CD }}
           private_key: ${{ secrets.ACTIONS_CD_PRIVATE_KEY }}
 
       - name: Checkout scheduling-service
-        uses: actions/checkout@v4
+        # Explicit fork guard at the step level so Sonar S7631 sees the protection.
+        # The job-level if already filters forks; this is a defence-in-depth check.
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            github.event.workflow_run.head_repository.fork == false
+          }}
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           path: scheduling-service
-          ref: ${{ github.event.workflow_run.head_branch || 'main' }}
+          # Pin to the trusted CI run head SHA (never a user-controllable branch ref).
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
           token: ${{ steps.generate_token.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -57,90 +76,94 @@ jobs:
       - name: Validate and determine commit SHA
         id: validate_commit
         working-directory: scheduling-service
+        env:
+          INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_SHA: ${{ github.sha }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          # Determine the commit SHA based on trigger type
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual trigger - use input or current commit
-            if [ -n "${{ inputs.commit_sha }}" ]; then
-              COMMIT_SHA="${{ inputs.commit_sha }}"
-              echo "Validating manually provided commit SHA: $COMMIT_SHA"
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            if [ -n "${INPUT_COMMIT_SHA}" ]; then
+              COMMIT_SHA="${INPUT_COMMIT_SHA}"
+              echo "Validating manually provided commit SHA"
 
-              # Validate SHA format (40 hex characters for full SHA or 7+ for short SHA)
               if ! echo "$COMMIT_SHA" | grep -qE '^[a-fA-F0-9]{7,40}$'; then
-                echo "❌ Error: Invalid commit SHA format. Must be 7-40 hexadecimal characters."
+                echo "Error: Invalid commit SHA format. Must be 7-40 hexadecimal characters."
                 exit 1
               fi
 
-              # Verify the commit exists in the repository
               if ! git rev-parse --verify "${COMMIT_SHA}^{commit}" >/dev/null 2>&1; then
-                echo "❌ Error: Commit SHA '${COMMIT_SHA}' does not exist in the repository."
+                echo "Error: Commit SHA does not exist in the repository."
                 echo "Please provide a valid commit SHA from the main branch."
                 exit 1
               fi
 
-              # Get the full SHA if a short SHA was provided
               COMMIT_SHA=$(git rev-parse --verify "${COMMIT_SHA}^{commit}")
-              echo "✅ Commit SHA validated successfully"
-              echo "Using manually provided commit SHA: $COMMIT_SHA"
+              echo "Commit SHA validated successfully"
             else
-              COMMIT_SHA="${{ github.sha }}"
-              echo "Using current commit SHA: $COMMIT_SHA"
+              COMMIT_SHA="${GH_SHA}"
+              echo "Using current commit SHA"
             fi
           else
-            # Automatic trigger from CI workflow
-            COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
-            # If empty, use github.sha as fallback
+            COMMIT_SHA="${WORKFLOW_RUN_HEAD_SHA}"
             if [ -z "$COMMIT_SHA" ]; then
-              COMMIT_SHA="${{ github.sha }}"
-              echo "Using github.sha as fallback: $COMMIT_SHA"
+              COMMIT_SHA="${GH_SHA}"
+              echo "Using github.sha as fallback"
             fi
           fi
 
-          # Store COMMIT_SHA as output for use in subsequent steps
-          echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
+          echo "commit_sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Verify image exists in registry
+        env:
+          COMMIT_SHA: ${{ steps.validate_commit.outputs.commit_sha }}
         run: |
-          COMMIT_SHA="${{ steps.validate_commit.outputs.commit_sha }}"
           SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
           IMAGE_TAG="sha-${SHORT_SHA}"
-          FULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
           FULL_IMAGE=$(echo "${FULL_IMAGE}" | tr '[:upper:]' '[:lower:]')
 
           echo "Verifying image existence: ${FULL_IMAGE}"
-          # We use docker manifest inspect which is available in modern docker versions
           if ! docker manifest inspect "${FULL_IMAGE}" > /dev/null 2>&1; then
-            echo "❌ Error: Docker image ${FULL_IMAGE} not found in registry."
+            echo "Error: Docker image not found in registry."
             echo "The CI pipeline might have failed to build or push the image for this commit."
             exit 1
           fi
-          echo "✅ Image found in registry"
+          echo "Image found in registry"
 
       - name: Determine trigger branch
         id: branch
+        env:
+          WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          TRIGGER_BRANCH="${{ github.event.workflow_run.head_branch || 'main' }}"
-          echo "trigger_branch=${TRIGGER_BRANCH}" >> $GITHUB_OUTPUT
+          TRIGGER_BRANCH="${WORKFLOW_RUN_HEAD_BRANCH:-main}"
+          echo "trigger_branch=${TRIGGER_BRANCH}" >> "$GITHUB_OUTPUT"
           if [ "$TRIGGER_BRANCH" = "main" ]; then
-            echo "infra_branch=main" >> $GITHUB_OUTPUT
+            echo "infra_branch=main" >> "$GITHUB_OUTPUT"
           else
-            echo "infra_branch=deploy/preprod" >> $GITHUB_OUTPUT
+            echo "infra_branch=deploy/preprod" >> "$GITHUB_OUTPUT"
           fi
-          echo "Trigger branch: ${TRIGGER_BRANCH}"
 
       - name: Checkout infrastructure repository
-        uses: actions/checkout@v4
+        # Defence-in-depth: never run if the upstream CI ran from a fork.
+        if: >-
+          ${{
+            github.event_name == 'workflow_dispatch' ||
+            github.event.workflow_run.head_repository.fork == false
+          }}
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: whispr-messenger/infrastructure
           path: infrastructure
           ref: ${{ steps.branch.outputs.infra_branch }}
           token: ${{ steps.generate_token.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Validate deployment manifest paths
+        env:
+          TRIGGER_BRANCH: ${{ steps.branch.outputs.trigger_branch }}
         run: |
-          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
-
           if [ "$TRIGGER_BRANCH" = "main" ]; then
             PATHS=(
               "infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
@@ -155,35 +178,24 @@ jobs:
 
           for MANIFEST_PATH in "${PATHS[@]}"; do
             if [ ! -f "$MANIFEST_PATH" ]; then
-              echo "❌ Error: Deployment manifest not found at $MANIFEST_PATH"
-              echo "Please verify the path in the infrastructure repository."
+              echo "Error: Deployment manifest not found at $MANIFEST_PATH"
               exit 1
             fi
-            echo "✅ Deployment manifest found at $MANIFEST_PATH"
+            echo "Deployment manifest found at $MANIFEST_PATH"
           done
 
       - name: Update image tag in deployment
         id: update_image
+        env:
+          COMMIT_SHA: ${{ steps.validate_commit.outputs.commit_sha }}
+          TRIGGER_BRANCH: ${{ steps.branch.outputs.trigger_branch }}
         run: |
-          # Use the validated commit SHA from the previous step
-          COMMIT_SHA="${{ steps.validate_commit.outputs.commit_sha }}"
-
-          # Extract short SHA safely using printf (7 characters, matching docker metadata-action default)
           SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
-
-          # Use the short SHA tag format that matches the CI docker workflow
           IMAGE_TAG="sha-${SHORT_SHA}"
-
-          # Build the full image reference with lowercase (OCI requirement)
-          FULL_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
           FULL_IMAGE=$(echo "${FULL_IMAGE}" | tr '[:upper:]' '[:lower:]')
 
-          echo "Commit SHA: $COMMIT_SHA"
-          echo "Short SHA: $SHORT_SHA"
-          echo "Image tag: $IMAGE_TAG"
           echo "Updating deployment image to: ${FULL_IMAGE}"
-
-          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
 
           if [ "$TRIGGER_BRANCH" = "main" ]; then
             MANIFESTS=(
@@ -203,9 +215,9 @@ jobs:
           done
 
       - name: Verify update
+        env:
+          TRIGGER_BRANCH: ${{ steps.branch.outputs.trigger_branch }}
         run: |
-          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
-
           if [ "$TRIGGER_BRANCH" = "main" ]; then
             MANIFESTS=(
               "infrastructure/k8s/whispr/prod/scheduling-service/deployment.yaml"
@@ -225,14 +237,16 @@ jobs:
 
       - name: Commit and push changes
         working-directory: infrastructure
+        env:
+          COMMIT_SHA: ${{ steps.validate_commit.outputs.commit_sha }}
+          TRIGGER_BRANCH: ${{ steps.branch.outputs.trigger_branch }}
+          INFRA_BRANCH: ${{ steps.branch.outputs.infra_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          TRIGGER_BRANCH="${{ steps.branch.outputs.trigger_branch }}"
-          INFRA_BRANCH="${{ steps.branch.outputs.infra_branch }}"
-
-          # Determine which files to add and check
           if [ "$TRIGGER_BRANCH" = "main" ]; then
             GIT_FILES=(
               "k8s/whispr/prod/scheduling-service/deployment.yaml"
@@ -245,7 +259,6 @@ jobs:
             )
           fi
 
-          # Check if there are changes to commit
           HAS_CHANGES=false
           for f in "${GIT_FILES[@]}"; do
             if ! git diff --quiet "$f" 2>/dev/null; then
@@ -259,15 +272,12 @@ jobs:
             exit 0
           fi
 
-          # Use the validated commit SHA determined in the previous step
-          COMMIT_SHA="${{ steps.validate_commit.outputs.commit_sha }}"
           SHORT_SHA=$(printf "%.7s" "$COMMIT_SHA")
 
-          # Build commit message based on trigger type
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA} (manual trigger)"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            COMMIT_MSG="chore(deploy/scheduling-service): update image to ${SHORT_SHA} (manual trigger)"
           else
-            COMMIT_MSG="🔧 chore(deploy/scheduling-service): update image to ${SHORT_SHA}"
+            COMMIT_MSG="chore(deploy/scheduling-service): update image to ${SHORT_SHA}"
           fi
 
           for f in "${GIT_FILES[@]}"; do
@@ -275,13 +285,12 @@ jobs:
           done
           git commit -m "${COMMIT_MSG}"
 
-          # Use a bounded retry loop around pull --rebase and push to handle concurrent updates robustly
           MAX_RETRIES=3
           for attempt in $(seq 1 "$MAX_RETRIES"); do
             echo "Attempt ${attempt}/${MAX_RETRIES}: pulling with rebase and pushing changes..."
 
             if ! git pull origin "${INFRA_BRANCH}" --rebase; then
-              echo "⚠️ Rebase failed, resetting and retrying..."
+              echo "Rebase failed, resetting and retrying..."
               git rebase --abort 2>/dev/null || true
               git reset --soft HEAD~1
               git commit -m "${COMMIT_MSG}"
@@ -289,16 +298,16 @@ jobs:
               continue
             fi
 
-            if git push https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/whispr-messenger/infrastructure.git HEAD:"${INFRA_BRANCH}"; then
-              echo "✅ Push successful on attempt ${attempt}"
+            if git push "https://x-access-token:${GH_TOKEN}@github.com/whispr-messenger/infrastructure.git" HEAD:"${INFRA_BRANCH}"; then
+              echo "Push successful on attempt ${attempt}"
               exit 0
             fi
 
-            echo "⚠️ Push failed on attempt ${attempt}, retrying..."
+            echo "Push failed on attempt ${attempt}, retrying..."
             sleep $((attempt * 2))
           done
 
-          echo "❌ Failed to push after ${MAX_RETRIES} attempts"
+          echo "Failed to push after ${MAX_RETRIES} attempts"
           exit 1
 
       - name: Fast-forward deploy/preprod with main on infrastructure repo

@@ -30,8 +30,10 @@ export class Job {
 	@Column({ type: 'text', nullable: true })
 	description: string | null;
 
-	@Column({ type: 'uuid', name: 'category_id' })
-	categoryId: string;
+	// nullable pour permettre ON DELETE SET NULL: les jobs survivent a la
+	// suppression de leur categorie (audit trail conserve)
+	@Column({ type: 'uuid', name: 'category_id', nullable: true })
+	categoryId: string | null;
 
 	@Column({ type: 'varchar', length: 100, name: 'target_service' })
 	targetService: string;
@@ -67,9 +69,14 @@ export class Job {
 	deletedAt: Date | null;
 
 	// Relations
-	@ManyToOne(() => JobCategory, (category) => category.jobs)
+	// onDelete SET NULL: si la categorie est supprimee, on garde le job
+	// (audit trail) et categoryId passe a NULL
+	@ManyToOne(() => JobCategory, (category) => category.jobs, {
+		onDelete: 'SET NULL',
+		nullable: true,
+	})
 	@JoinColumn({ name: 'category_id' })
-	category: JobCategory;
+	category: JobCategory | null;
 
 	@OneToMany(() => Schedule, (schedule) => schedule.job, { cascade: true })
 	schedules: Schedule[];

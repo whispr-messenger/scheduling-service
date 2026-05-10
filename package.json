@@ -32,16 +32,17 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.9.0",
-    "@grpc/proto-loader": "^0.7.0",
+    "@grpc/proto-loader": "^0.8.1",
     "@grpc/reflection": "^1.0.4",
     "@keyv/redis": "^5.1.4",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/bullmq": "^10.2.1",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.9",
     "@nestjs/jwt": "^11.0.2",
-    "@nestjs/microservices": "^11.1.9",
+    "@nestjs/microservices": "^11.1.19",
     "@nestjs/platform-express": "^11.1.9",
     "@nestjs/schedule": "^4.0.2",
     "@nestjs/swagger": "^11.2.1",
@@ -52,6 +53,7 @@
     "cache-manager": "^7.2.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "helmet": "^8.1.0",
     "ioredis": "^5.4.1",
     "nodemailer": "^7.0.11",
     "pg": "^8.16.0",
@@ -121,7 +123,8 @@
       "<rootDir>"
     ],
     "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/$1"
+      "^src/(.*)$": "<rootDir>/$1",
+      "^@/(.*)$": "<rootDir>/$1"
     },
     "setupFilesAfterEnv": [
       "<rootDir>/../test/setup.ts"

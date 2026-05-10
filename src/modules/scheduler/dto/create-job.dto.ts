@@ -10,10 +10,12 @@ import {
 	Min,
 	Max,
 	MaxLength,
+	Validate,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { Priority } from '../entities/enums';
+import { MaxJsonSizeConstraint } from '@/common/validators/max-json-size.validator';
 
 export class CreateJobDto {
 	@ApiProperty({
@@ -60,10 +62,11 @@ export class CreateJobDto {
 	targetMethod: string;
 
 	@ApiProperty({
-		description: 'JSON payload to pass to the target method',
+		description: 'JSON payload to pass to the target method (max 8 KB serialized)',
 		example: { userId: '123', template: 'welcome' },
 	})
 	@IsObject()
+	@Validate(MaxJsonSizeConstraint)
 	payload: Record<string, any>;
 
 	@ApiPropertyOptional({

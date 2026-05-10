@@ -6,26 +6,18 @@ import {
 	Delete,
 	Body,
 	Param,
-	Query,
 	HttpCode,
 	HttpStatus,
 	ParseUUIDPipe,
 	UseInterceptors,
 } from '@nestjs/common';
-import {
-	ApiTags,
-	ApiOperation,
-	ApiResponse,
-	ApiParam,
-	ApiQuery,
-	ApiBearerAuth,
-	ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { ScheduledMessagesService } from '../services/scheduled-messages.service';
 import { CreateScheduledMessageDto } from '../dto/create-scheduled-message.dto';
 import { UpdateScheduledMessageDto } from '../dto/update-scheduled-message.dto';
 import { ScheduledMessageResponseDto } from '../dto/scheduled-message-response.dto';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
 @ApiTags('Scheduled Messages')
 @ApiBearerAuth()
@@ -44,36 +36,28 @@ export class ScheduledMessagesController {
 		type: ScheduledMessageResponseDto,
 	})
 	@ApiResponse({ status: 400, description: 'Invalid input data' })
-	async create(@Body() dto: CreateScheduledMessageDto): Promise<ScheduledMessageResponseDto> {
-		return this.scheduledMessagesService.create(dto);
+	async create(
+		@CurrentUser('userId') userId: string,
+		@Body() dto: CreateScheduledMessageDto
+	): Promise<ScheduledMessageResponseDto> {
+		// userId provient du JWT, jamais du body : sinon IDOR.
+		return this.scheduledMessagesService.create(userId, dto);
 	}
 
 	@Get()
 	@ApiOperation({ summary: "List user's scheduled messages" })
-	@ApiQuery({
-		name: 'userId',
-		required: true,
-		type: 'string',
-		description: 'User ID to filter scheduled messages',
-	})
 	@ApiResponse({
 		status: 200,
 		description: 'Scheduled messages retrieved successfully',
 		type: [ScheduledMessageResponseDto],
 	})
-	async findAll(@Query('userId', ParseUUIDPipe) userId: string): Promise<ScheduledMessageResponseDto[]> {
+	async findAll(@CurrentUser('userId') userId: string): Promise<ScheduledMessageResponseDto[]> {
 		return this.scheduledMessagesService.findAllByUser(userId);
 	}
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Get a scheduled message by ID' })
 	@ApiParam({ name: 'id', description: 'Scheduled message ID', type: 'string' })
-	@ApiQuery({
-		name: 'userId',
-		required: true,
-		type: 'string',
-		description: 'User ID for ownership validation',
-	})
 	@ApiResponse({
 		status: 200,
 		description: 'Scheduled message retrieved successfully',
@@ -82,7 +66,7 @@ export class ScheduledMessagesController {
 	@ApiResponse({ status: 404, description: 'Scheduled message not found' })
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
-		@Query('userId', ParseUUIDPipe) userId: string
+		@CurrentUser('userId') userId: string
 	): Promise<ScheduledMessageResponseDto> {
 		return this.scheduledMessagesService.findOne(id, userId);
 	}
@@ -90,12 +74,6 @@ export class ScheduledMessagesController {
 	@Patch(':id')
 	@ApiOperation({ summary: 'Update a scheduled message (only if still pending)' })
 	@ApiParam({ name: 'id', description: 'Scheduled message ID', type: 'string' })
-	@ApiQuery({
-		name: 'userId',
-		required: true,
-		type: 'string',
-		description: 'User ID for ownership validation',
-	})
 	@ApiBody({ type: UpdateScheduledMessageDto })
 	@ApiResponse({
 		status: 200,
@@ -106,7 +84,7 @@ export class ScheduledMessagesController {
 	@ApiResponse({ status: 404, description: 'Scheduled message not found' })
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
-		@Query('userId', ParseUUIDPipe) userId: string,
+		@CurrentUser('userId') userId: string,
 		@Body() dto: UpdateScheduledMessageDto
 	): Promise<ScheduledMessageResponseDto> {
 		return this.scheduledMessagesService.update(id, userId, dto);
@@ -116,18 +94,12 @@ export class ScheduledMessagesController {
 	@HttpCode(HttpStatus.NO_CONTENT)
 	@ApiOperation({ summary: 'Cancel a scheduled message' })
 	@ApiParam({ name: 'id', description: 'Scheduled message ID', type: 'string' })
-	@ApiQuery({
-		name: 'userId',
-		required: true,
-		type: 'string',
-		description: 'User ID for ownership validation',
-	})
 	@ApiResponse({ status: 204, description: 'Scheduled message cancelled successfully' })
 	@ApiResponse({ status: 400, description: 'Cannot cancel non-pending message' })
 	@ApiResponse({ status: 404, description: 'Scheduled message not found' })
 	async cancel(
 		@Param('id', ParseUUIDPipe) id: string,
-		@Query('userId', ParseUUIDPipe) userId: string
+		@CurrentUser('userId') userId: string
 	): Promise<void> {
 		return this.scheduledMessagesService.cancel(id, userId);
 	}
