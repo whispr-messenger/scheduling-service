@@ -23,15 +23,19 @@ import {
 	ApiQuery,
 	ApiBearerAuth,
 	ApiBody,
+	ApiSecurity,
 } from '@nestjs/swagger';
 import { SchedulerService } from '../services/scheduler.service';
 import { CreateJobDto } from '../dto/create-job.dto';
 import { ScheduleJobDto } from '../dto/schedule-job.dto';
 import { JobResponseDto, ScheduleResponseDto, ExecutionResponseDto } from '../dto/job-response.dto';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { InternalApiGuard } from '@/common/guards/internal-api.guard';
 
 @ApiTags('Scheduler')
+@ApiSecurity('x-internal-token')
 @Controller('api/v1/jobs')
+@UseGuards(InternalApiGuard)
 @UseInterceptors(LoggingInterceptor)
 export class SchedulerController {
 	constructor(private readonly schedulerService: SchedulerService) {}

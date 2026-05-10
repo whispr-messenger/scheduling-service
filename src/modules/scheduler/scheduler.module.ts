@@ -7,6 +7,7 @@ import { DatabaseModule } from '@/modules/database/database.module';
 import { QueuesModule } from '@/modules/queues/queues.module';
 import { GrpcModule } from '@/modules/grpc/grpc.module';
 import { CommonModule } from '@/common/common.module';
+import { InternalApiGuard } from '@/common/guards/internal-api.guard';
 import { Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobDependency } from './entities';
 
 @Module({
@@ -27,7 +28,7 @@ import { Job, Schedule, Execution, JobCategory, ExecutionLog, RecurringJob, JobD
 		CommonModule,
 	],
 	controllers: [SchedulerController],
-	providers: [SchedulerService],
+	providers: [SchedulerService, InternalApiGuard],
 	exports: [SchedulerService],
 })
 export class SchedulerModule {}

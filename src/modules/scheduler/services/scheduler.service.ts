@@ -206,9 +206,12 @@ export class SchedulerService {
 			const duration = Date.now() - startTime;
 			savedExecution.status = ExecutionStatus.FAILED;
 			savedExecution.failedAt = new Date();
+			// Ne pas persister la stack trace : elle contient des chemins internes
+			// (/app/src/...) qui facilitent le fingerprinting du runtime en cas de
+			// fuite de l'API. La stack reste disponible dans les logs serveur ci-dessous.
 			savedExecution.errorData = {
 				error: error.message,
-				stack: error.stack,
+				code: (error.code as string | undefined) ?? null,
 			};
 			savedExecution.durationMs = duration;
 
@@ -218,6 +221,7 @@ export class SchedulerService {
 				executionId,
 				jobId,
 				error: error.message,
+				stack: error.stack,
 				duration,
 			});
 

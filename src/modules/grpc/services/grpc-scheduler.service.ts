@@ -194,7 +194,9 @@ export class GrpcSchedulerService {
 			id: job.id,
 			name: job.name,
 			description: job.description,
-			categoryId: job.categoryId,
+			// proto3 string ne supporte pas null: on remplace par '' si la
+			// categorie a ete supprimee (FK SET NULL)
+			categoryId: job.categoryId ?? '',
 			targetService: job.targetService,
 			targetMethod: job.targetMethod,
 			payload: JSON.stringify(job.payload),
