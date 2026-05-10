@@ -9,6 +9,7 @@ beforeAll(async () => {
 	process.env.REDIS_HOST = 'localhost';
 	process.env.REDIS_PORT = '6379';
 	process.env.REDIS_DB = '1';
+	process.env.WEBHOOK_HMAC_SECRET = 'test-webhook-secret-unit-placeholder'; // NOSONAR - test environment default
 });
 
 // Global test teardown
@@ -29,6 +30,7 @@ jest.mock('@nestjs/bullmq', () => ({
 	getQueueToken: jest.fn((name: string) => `BullQueue_${name}`),
 	InjectQueue: jest.fn(() => jest.fn()),
 	Processor: jest.fn(() => jest.fn()),
+	OnWorkerEvent: jest.fn(() => jest.fn()),
 	WorkerHost: class MockWorkerHost {},
 }));
 

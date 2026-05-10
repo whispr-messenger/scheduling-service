@@ -2,7 +2,10 @@ import { Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigModuleOptions, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { CacheModule, CacheModuleAsyncOptions } from '@nestjs/cache-manager';
-import { ThrottlerModule, ThrottlerGuard, ThrottlerModuleOptions, ThrottlerOptions } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard, ThrottlerOptions } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import Redis from 'ioredis';
+import { buildRedisOptions } from '../../config/redis.config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { MonitoringModule } from '../monitoring/monitoring.module';
@@ -38,15 +41,16 @@ const cacheModuleAsyncOptions: CacheModuleAsyncOptions = {
 	isGlobal: true,
 };
 
-// BullMQ Queue (Redis)
+// BullMQ Queue (Redis — supports direct + sentinel modes)
+// BullMQ requires maxRetriesPerRequest: null for workers' blocking commands
+// (see https://docs.bullmq.io/guide/connections)
 const bullModuleAsyncOptions = {
 	imports: [ConfigModule],
 	useFactory: (configService: ConfigService) => ({
 		connection: {
-			host: configService.get('REDIS_HOST', 'localhost'),
-			port: configService.get('REDIS_PORT', 6379),
-			password: configService.get('REDIS_PASSWORD'),
-			db: configService.get('REDIS_DB', 0),
+			...buildRedisOptions(configService),
+			maxRetriesPerRequest: null,
+			enableReadyCheck: false,
 		},
 		defaultJobOptions: {
 			removeOnComplete: 50,
@@ -82,8 +86,6 @@ const LONG_THROTTLER: ThrottlerOptions = {
 	limit: 100,
 };
 
-const throttlerModuleOptions: ThrottlerModuleOptions = [SHORT_THROTTLER, MEDIUM_THROTTLER, LONG_THROTTLER];
-
 const throttlerGuardProvider: Provider = {
 	provide: APP_GUARD,
 	useClass: ThrottlerGuard,
@@ -94,7 +96,14 @@ const throttlerGuardProvider: Provider = {
 		ConfigModule.forRoot(configModuleOptions),
 		TypeOrmModule.forRootAsync(typeOrmModuleAsyncOptions),
 		CacheModule.registerAsync(cacheModuleAsyncOptions),
-		ThrottlerModule.forRoot(throttlerModuleOptions),
+		ThrottlerModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: (configService: ConfigService) => ({
+				throttlers: [SHORT_THROTTLER, MEDIUM_THROTTLER, LONG_THROTTLER],
+				storage: new ThrottlerStorageRedisService(new Redis(buildRedisOptions(configService))),
+			}),
+		}),
 		BullModule.forRootAsync(bullModuleAsyncOptions),
 		ScheduleModule.forRoot(),
 		HealthModule,

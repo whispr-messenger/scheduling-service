@@ -1,15 +1,8 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsDateString, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsObject, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsISO8601WithOffset } from '@/common/decorators/is-iso8601-with-offset.decorator';
 
 export class CreateScheduledMessageDto {
-	@ApiProperty({
-		description: 'ID of the user scheduling the message',
-		example: 'a1b2c3d4-5678-9abc-def0-123456789abc',
-	})
-	@IsUUID()
-	@IsNotEmpty()
-	userId: string;
-
 	@ApiProperty({
 		description: 'ID of the conversation to send the message to',
 		example: 'b2c3d4e5-6789-abcd-ef01-23456789abcd',
@@ -21,9 +14,11 @@ export class CreateScheduledMessageDto {
 	@ApiProperty({
 		description: 'Message content',
 		example: 'Hello, this is a scheduled message!',
+		maxLength: 4000,
 	})
 	@IsString()
 	@IsNotEmpty()
+	@MaxLength(4000)
 	content: string;
 
 	@ApiPropertyOptional({
@@ -35,10 +30,11 @@ export class CreateScheduledMessageDto {
 	metadata?: Record<string, any>;
 
 	@ApiProperty({
-		description: 'When the message should be sent (ISO 8601 format, must be in the future)',
-		example: '2026-04-15T10:00:00Z',
+		description:
+			'When the message should be sent (ISO 8601 with explicit timezone offset, must be in the future)',
+		example: '2026-04-15T10:00:00+02:00',
 	})
-	@IsDateString()
+	@IsISO8601WithOffset()
 	@IsNotEmpty()
 	scheduledAt: string;
 }

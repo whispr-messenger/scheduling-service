@@ -2,6 +2,10 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 export enum ScheduledMessageStatus {
 	PENDING = 'pending',
+	// Etat intermediaire pose atomiquement avant d'envoyer le message.
+	// Empeche un autre pod de retraiter le meme enregistrement si notre lock
+	// Redis expire en cours de boucle (cf processDueMessages).
+	PROCESSING = 'processing',
 	SENT = 'sent',
 	CANCELLED = 'cancelled',
 	FAILED = 'failed',
@@ -27,7 +31,10 @@ export class ScheduledMessage {
 	@Column({ type: 'jsonb', nullable: true, default: null })
 	metadata: Record<string, any> | null;
 
-	@Column({ type: 'timestamp', name: 'scheduled_at' })
+	// timestamptz : on stocke l'instant absolu UTC. Le DTO impose un offset
+	// timezone explicite cote API (cf is-iso8601-with-offset.decorator), donc
+	// `new Date(dto.scheduledAt)` produit toujours le bon instant.
+	@Column({ type: 'timestamptz', name: 'scheduled_at' })
 	scheduledAt: Date;
 
 	@Column({
@@ -37,9 +44,15 @@ export class ScheduledMessage {
 	})
 	status: ScheduledMessageStatus;
 
-	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
+	// Compteur d'echecs transients (timeout, 5xx, ECONNREFUSED, etc).
+	// Au dela de RETRY_LIMIT, le message bascule en FAILED definitif.
+	// Une erreur permanente (4xx hors 408/429/503/504) court-circuite ce compteur.
+	@Column({ type: 'int', name: 'retry_count', default: 0 })
+	retryCount: number;
+
+	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
 	createdAt: Date;
 
-	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
 	updatedAt: Date;
 }

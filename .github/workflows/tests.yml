@@ -103,6 +103,7 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           REDIS_DB: 0
+          REDIS_PASSWORD: ''
 
       - name: Run e2e tests
         run: npm run test:e2e
@@ -117,6 +118,7 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           REDIS_DB: 0
+          REDIS_PASSWORD: ''
           JWT_SECRET: test-jwt-secret
           GRPC_PORT: 50053
           HTTP_PORT: 3000
