@@ -31,7 +31,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
     "@grpc/reflection": "^1.0.4",
     "@keyv/redis": "^5.1.4",
